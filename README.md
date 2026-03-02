@@ -4,16 +4,16 @@
 
 ## 技術スタック
 
-| 技術 | 用途 |
-|---|---|
-| Next.js (App Router) | フロント＋API |
-| NextAuth.js | GitHub OAuth認証 |
-| Prisma | ORM |
-| Supabase (PostgreSQL) | データベース |
-| Upstash (Redis) | キャッシュ |
-| Discord.js | Discord Bot |
-| Vercel | デプロイ |
-| Railway | Bot ホスティング |
+| 技術                  | 用途             |
+| --------------------- | ---------------- |
+| Next.js (App Router)  | フロント＋API    |
+| NextAuth.js           | GitHub OAuth認証 |
+| Prisma                | ORM              |
+| Supabase (PostgreSQL) | データベース     |
+| Upstash (Redis)       | キャッシュ       |
+| Discord.js            | Discord Bot      |
+| Vercel                | デプロイ         |
+| Railway               | Bot ホスティング |
 
 ## セットアップ
 
