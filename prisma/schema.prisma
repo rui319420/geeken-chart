@@ -2,8 +2,8 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client"           // ← js を削除
-  output   = "../src/generated/prisma" // ← 出力先を指定
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
