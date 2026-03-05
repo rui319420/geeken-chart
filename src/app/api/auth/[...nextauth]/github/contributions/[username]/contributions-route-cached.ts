@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getContributionData } from "@/lib/github-graphql";
+import { withCache, cacheKey, TTL } from "@/lib/redis";
 import { auth } from "@/auth";
 
 type RouteParams = {
@@ -10,8 +11,7 @@ type RouteParams = {
  * GET /api/github/contributions/[username]?year=2024
  *
  * 指定ユーザーのGitHubコントリビューション（草）データを返す。
- * - year クエリパラメータで年を指定可能（省略時は直近1年）
- * - 認証済みユーザーのみアクセス可能
+ * Upstash Redisで1時間キャッシュ。
  */
 export async function GET(request: Request, { params }: RouteParams) {
   // 認証チェック
@@ -36,7 +36,10 @@ export async function GET(request: Request, { params }: RouteParams) {
   }
 
   try {
-    const data = await getContributionData(username, token, year);
+    const data = await withCache(cacheKey.contributions(username, year), TTL.CONTRIBUTIONS, () =>
+      getContributionData(username, token, year),
+    );
+
     return NextResponse.json(data);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
