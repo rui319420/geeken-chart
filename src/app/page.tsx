@@ -1,4 +1,5 @@
 import { signIn } from "@/auth";
+import LanguageTrendChart from "./components/LanguageTrendChart";
 
 export default function LoginPage() {
   return (
@@ -17,6 +18,9 @@ export default function LoginPage() {
           GitHubでログイン
         </button>
       </form>
+      <div>
+        <LanguageTrendChart></LanguageTrendChart>
+      </div>
     </div>
   );
 }
