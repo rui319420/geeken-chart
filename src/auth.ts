@@ -4,8 +4,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  adapter: PrismaAdapter(prisma as any),
+  adapter: PrismaAdapter(prisma),
   providers: [
     GitHub({
       clientId: process.env.GITHUB_ID,
@@ -16,7 +15,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           name: profile.name ?? profile.login,
           email: profile.email,
           image: profile.avatar_url,
-          githubID: profile.id.toString(),
+          githubId: profile.id.toString(),
           githubName: profile.login,
         };
       },
