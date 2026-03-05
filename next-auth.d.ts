@@ -6,4 +6,10 @@ declare module "next-auth" {
       id: string;
     } & DefaultSession["user"];
   }
+
+  interface User {
+    githubId?: string;
+    githubName?: string;
+    avatarUrl?: string;
+  }
 }
