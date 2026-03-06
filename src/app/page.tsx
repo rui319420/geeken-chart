@@ -1,22 +1,31 @@
-import { signIn } from "@/auth";
+import LanguagePieChart from "@/components/LanguagePieChart";
+import LanguageTrendChart from "@/components/LanguageTrendChart";
 
-export default function LoginPage() {
+export default function Home() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-24">
-      <h1 className="mb-8 text-2xl font-bold">技研チャート 仮ログイン画面</h1>
-      <form
-        action={async () => {
-          "use server";
-          await signIn("github", { redirectTo: "/" });
-        }}
-      >
-        <button
-          type="submit"
-          className="rounded bg-gray-800 px-6 py-3 font-semibold text-white hover:bg-gray-700"
-        >
-          GitHubでログイン
-        </button>
-      </form>
-    </div>
+    <main className="min-h-screen bg-[#0d1117] p-6 text-[#F2F3F5] md:p-12">
+      <div className="mx-auto max-w-6xl space-y-8">
+        <header className="border-b border-[#2ea043]/30 pb-6">
+          <h1 className="bg-gradient-to-r from-[#2ea043] to-[#5865F2] bg-clip-text text-3xl font-extrabold tracking-tight text-transparent md:text-4xl">
+            Circle Vital Dashboard
+          </h1>
+          <p className="mt-2 text-[15px] text-[#949BA4]">
+            GitHubとDiscordのAPIを活用したサークル活動トレンドの可視化
+          </p>
+        </header>
+
+        <div className="grid grid-cols-1 gap-6">
+          <section>
+            <LanguagePieChart />
+          </section>
+          <section>
+            <LanguageTrendChart />
+          </section>
+
+          {/* 今後、他のグラフ（コミット数やDiscordのアクティブ時間など）を追加する場合はここに並べます */}
+          {/* <section> ... </section> */}
+        </div>
+      </div>
+    </main>
   );
 }
