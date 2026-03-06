@@ -124,7 +124,6 @@ export default function ContributionGraph() {
   }, []);
 
   const maxCount = data.length > 0 ? Math.max(...data.map((d) => d.count)) : 0;
-  const totalCount = data.reduce((s, d) => s + d.count, 0);
   const tickInterval = getTickInterval(period, data.length);
 
   return (
