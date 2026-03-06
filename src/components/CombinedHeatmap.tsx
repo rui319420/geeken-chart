@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, startTransition } from "react";
+import { useEffect, useState, useRef, startTransition } from "react";
 import { ActivityCalendar, type ThemeInput } from "react-activity-calendar";
 
 type ContributionData = {
@@ -27,10 +27,10 @@ export default function CombinedHeatmap() {
   const [period, setPeriod] = useState<Period>("latest");
   const [data, setData] = useState<ContributionData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [cache, setCache] = useState<Partial<Record<Period, ContributionData[]>>>({});
+  const cacheRef = useRef<Partial<Record<Period, ContributionData[]>>>({});
 
   useEffect(() => {
-    const cached = cache[period];
+    const cached = cacheRef.current[period];
     if (cached) {
       startTransition(() => {
         setData(cached);
@@ -50,10 +50,8 @@ export default function CombinedHeatmap() {
         return res.json();
       })
       .then((json: ContributionData[]) => {
-        startTransition(() => {
-          setData(json);
-          setCache((prev) => ({ ...prev, [period]: json }));
-        });
+        cacheRef.current[period] = json; // ← refに直接代入
+        startTransition(() => setData(json));
       })
       .catch((error) => {
         console.error("Failed to fetch combined contributions:", error);

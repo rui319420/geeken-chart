@@ -1,6 +1,7 @@
 import CombinedHeatmap from "@/components/CombinedHeatmap";
 import LanguagePieChart from "@/components/LanguagePieChart";
 import LanguageTrendChart from "@/components/LanguageTrendChart";
+import StatsCards from "@/components/StatsCards";
 
 export default function Home() {
   return (
@@ -16,6 +17,9 @@ export default function Home() {
         </header>
 
         <div className="grid grid-cols-1 gap-6">
+          <section>
+            <StatsCards />
+          </section>
           <section>
             <LanguagePieChart />
           </section>
