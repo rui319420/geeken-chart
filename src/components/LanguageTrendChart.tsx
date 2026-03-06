@@ -130,7 +130,7 @@ export default function LanguageTrendChart({ data = mockData }: { data?: ChartDa
             return (
               <Line
                 key={lang}
-                type="monotone" // 滑らかな曲線に（linearから変更）
+                type="linear"
                 dataKey={lang}
                 name={lang}
                 stroke={strokeColor}
