@@ -1,5 +1,7 @@
+import CombinedHeatmap from "@/components/CombinedHeatmap";
 import LanguagePieChart from "@/components/LanguagePieChart";
 import LanguageTrendChart from "@/components/LanguageTrendChart";
+import StatsCards from "@/components/StatsCards";
 
 export default function Home() {
   return (
@@ -16,12 +18,17 @@ export default function Home() {
 
         <div className="grid grid-cols-1 gap-6">
           <section>
+            <StatsCards />
+          </section>
+          <section>
             <LanguagePieChart />
           </section>
           <section>
             <LanguageTrendChart />
           </section>
-
+          <section>
+            <CombinedHeatmap />
+          </section>
           {/* 今後、他のグラフ（コミット数やDiscordのアクティブ時間など）を追加する場合はここに並べます */}
           {/* <section> ... </section> */}
         </div>
