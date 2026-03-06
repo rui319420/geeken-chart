@@ -1,38 +1,72 @@
+import { auth } from "@/auth";
+import Header from "@/components/Header";
+import StatsCards from "@/components/StatsCards";
 import CombinedHeatmap from "@/components/CombinedHeatmap";
 import LanguagePieChart from "@/components/LanguagePieChart";
-import LanguageTrendChart from "@/components/LanguageTrendChart";
-import StatsCards from "@/components/StatsCards";
+import ContributionGraph from "@/components/ContributionGraph";
 
-export default function Home() {
+// メンバー一覧（仮）
+function MemberList() {
+  const members = [{ name: "rui319420", avatar: "https://github.com/rui319420.png" }];
+
   return (
-    <main className="min-h-screen bg-[#0d1117] p-6 text-[#F2F3F5] md:p-12">
-      <div className="mx-auto max-w-6xl space-y-8">
-        <header className="border-b border-[#2ea043]/30 pb-6">
-          <h1 className="bg-gradient-to-r from-[#2ea043] to-[#5865F2] bg-clip-text text-3xl font-extrabold tracking-tight text-transparent md:text-4xl">
-            Circle Vital Dashboard
-          </h1>
-          <p className="mt-2 text-[15px] text-[#949BA4]">
-            GitHubとDiscordのAPIを活用したサークル活動トレンドの可視化
-          </p>
-        </header>
-
-        <div className="grid grid-cols-1 gap-6">
-          <section>
-            <StatsCards />
-          </section>
-          <section>
-            <LanguagePieChart />
-          </section>
-          <section>
-            <LanguageTrendChart />
-          </section>
-          <section>
-            <CombinedHeatmap />
-          </section>
-          {/* 今後、他のグラフ（コミット数やDiscordのアクティブ時間など）を追加する場合はここに並べます */}
-          {/* <section> ... </section> */}
-        </div>
+    <div className="flex w-full flex-col rounded-xl border border-white/5 bg-[#0d1117] p-6">
+      <h2 className="mb-4 text-sm font-bold tracking-widest text-[#636e7b] uppercase">メンバー</h2>
+      <div className="flex flex-wrap gap-3">
+        {members.map((m) => (
+          <a
+            key={m.name}
+            href={`https://github.com/${m.name}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex items-center gap-2 rounded-lg border border-white/5 bg-white/[0.03] px-3 py-2 transition-all duration-200 hover:border-white/10 hover:bg-white/[0.06]"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={m.avatar} alt={m.name} width={24} height={24} className="rounded-full" />
+            <span className="text-xs text-[#949BA4] group-hover:text-[#F2F3F5]">{m.name}</span>
+          </a>
+        ))}
       </div>
-    </main>
+    </div>
+  );
+}
+
+export default async function HomePage() {
+  const session = await auth();
+
+  return (
+    <div className="min-h-screen bg-[#0d1117]">
+      <Header />
+
+      <main className="mx-auto max-w-7xl px-4 py-8 md:px-6 md:py-10">
+        {/* 未ログイン時のバナー */}
+        {!session && (
+          <div className="mb-8 rounded-xl border border-[#2ea043]/20 bg-[#2ea043]/5 px-5 py-4">
+            <p className="text-sm text-[#949BA4]">
+              <span className="font-medium text-[#3fb950]">GitHubでログイン</span>
+              すると、あなたの活動もダッシュボードに反映されます。
+            </p>
+          </div>
+        )}
+
+        {/* StatsCards - 1カラム */}
+        <section className="mb-6">
+          <StatsCards />
+        </section>
+
+        {/* ヒートマップ - 1カラム */}
+        <section className="mb-6">
+          <CombinedHeatmap />
+        </section>
+        <section className="mb-6">
+          <ContributionGraph />
+        </section>
+
+        <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <LanguagePieChart />
+          <MemberList />
+        </section>
+      </main>
+    </div>
   );
 }

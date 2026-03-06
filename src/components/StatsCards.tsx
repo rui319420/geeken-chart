@@ -7,7 +7,6 @@ interface StatItem {
   unit: string;
   label: string;
   color: string;
-  icon: React.ReactNode;
 }
 
 // カウントアップアニメーション
@@ -58,14 +57,6 @@ function StatCard({ item, delay }: { item: StatItem; delay: number }) {
         style={{ background: item.color }}
       />
 
-      {/* アイコン */}
-      <div
-        className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg"
-        style={{ background: `${item.color}18`, color: item.color }}
-      >
-        {item.icon}
-      </div>
-
       {/* 数値 */}
       <div className="flex items-end gap-1">
         <span
@@ -106,78 +97,24 @@ export default function StatsCards() {
       unit: "人",
       label: "メンバー",
       color: "#58a6ff",
-      icon: (
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-          <circle cx="9" cy="7" r="4" />
-          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-        </svg>
-      ),
     },
     {
       value: MOCK_STATS.commits,
       unit: "",
       label: "総コミット数",
       color: "#39d353",
-      icon: (
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <circle cx="12" cy="12" r="4" />
-          <line x1="1.05" y1="12" x2="7" y2="12" />
-          <line x1="17.01" y1="12" x2="22.96" y2="12" />
-        </svg>
-      ),
     },
     {
       value: MOCK_STATS.languages,
       unit: "種",
       label: "使用言語",
       color: "#f78166",
-      icon: (
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <polyline points="16 18 22 12 16 6" />
-          <polyline points="8 6 2 12 8 18" />
-        </svg>
-      ),
     },
     {
       value: MOCK_STATS.repositories,
       unit: "個",
       label: "リポジトリ",
       color: "#e3b341",
-      icon: (
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <path d="M3 3h18v18H3zM3 9h18M9 21V9" />
-        </svg>
-      ),
     },
   ];
 

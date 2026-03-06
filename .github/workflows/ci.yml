@@ -131,7 +131,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d "$(jq -n --arg prompt "$PROMPT" '{
               contents: [{ parts: [{ text: $prompt }] }],
-              generationConfig: { maxOutputTokens: 2000 }
+              generationConfig: { maxOutputTokens: 5000 }
             }')")
 
           # デバッグ用ログ

@@ -65,7 +65,7 @@ const renderActiveShape = ({
 
   return (
     <g>
-      <text x={cx} y={cy} dy={8} textAnchor="middle" fill={fill} fontSize={24} fontWeight="bold">
+      <text x={cx} y={cy} dy={8} textAnchor="middle" fill={fill} fontSize={22} fontWeight="bold">
         {(payload as { name: string }).name}
       </text>
       <Sector
