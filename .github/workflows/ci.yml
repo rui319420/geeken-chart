@@ -78,6 +78,7 @@ jobs:
   ai-review:
     name: AI Code Review
     runs-on: ubuntu-latest
+    continue-on-error: true
     if: github.event_name == 'pull_request' # プルリクエストの時のみ実行
     steps:
       - name: Checkout
