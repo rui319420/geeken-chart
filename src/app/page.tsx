@@ -1,3 +1,4 @@
+import CombinedHeatmap from "@/components/CombinedHeatmap";
 import LanguagePieChart from "@/components/LanguagePieChart";
 import LanguageTrendChart from "@/components/LanguageTrendChart";
 
@@ -21,7 +22,9 @@ export default function Home() {
           <section>
             <LanguageTrendChart />
           </section>
-
+          <section>
+            <CombinedHeatmap />
+          </section>
           {/* 今後、他のグラフ（コミット数やDiscordのアクティブ時間など）を追加する場合はここに並べます */}
           {/* <section> ... </section> */}
         </div>

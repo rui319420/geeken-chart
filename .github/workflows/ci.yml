@@ -100,7 +100,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
         run: |
-          DIFF=$(cat diff.txt | head -c 10000)
+          DIFF=$(cat diff.txt | head -c 50000)
 
           PROMPT="あなたはシニアエンジニアです。以下のgit diffをレビューしてください。
 
