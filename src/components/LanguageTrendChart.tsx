@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   LineChart,
   Line,
@@ -28,42 +28,6 @@ const GITHUB_LANGUAGE_COLORS: Record<string, string> = {
 interface DataPoint {
   month: string;
   [lang: string]: string | number;
-}
-
-// モックデータ生成（1年固定）
-function generateMockData(): DataPoint[] {
-  const months = 12;
-  const languages = ["TypeScript", "Python", "JavaScript", "C", "Rust"];
-
-  // 各言語の初期値とトレンド
-  const init: Record<string, number> = {
-    TypeScript: 38,
-    Python: 28,
-    JavaScript: 20,
-    C: 18,
-    Rust: 8,
-  };
-  const trend: Record<string, number> = {
-    TypeScript: 0.8,
-    Python: 0.3,
-    JavaScript: -0.4,
-    C: -0.2,
-    Rust: 0.5,
-  };
-
-  const now = new Date();
-  return Array.from({ length: months }, (_, i) => {
-    const d = new Date(now);
-    d.setMonth(now.getMonth() - (months - 1 - i));
-    const point: DataPoint = {
-      month: `${d.getFullYear()}/${d.getMonth() + 1}`,
-    };
-    languages.forEach((lang) => {
-      const noise = (Math.random() - 0.5) * 4;
-      point[lang] = Math.max(1, Math.round(init[lang] + trend[lang] * i + noise));
-    });
-    return point;
-  });
 }
 
 // カスタムツールチップ
@@ -178,8 +142,24 @@ const CustomLegend = ({
 
 export default function LanguageTrendChart() {
   const [hiddenLines, setHiddenLines] = useState<Set<string>>(new Set());
+  const [data, setData] = useState<DataPoint[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [includePrivate, setIncludePrivate] = useState(false);
 
-  const data = useMemo(() => generateMockData(), []);
+  useEffect(() => {
+    // 設定取得（ログイン中のみ）
+    fetch("/api/user/settings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s) => s && setIncludePrivate(s.includePrivate ?? false))
+      .catch(() => {});
+
+    // 言語トレンドAPI
+    fetch("/api/languages/trend")
+      .then((r) => r.json())
+      .then((json: DataPoint[]) => setData(json))
+      .catch((e) => console.error("Trend fetch failed:", e))
+      .finally(() => setLoading(false));
+  }, []);
 
   const languages = useMemo(() => {
     const keys = new Set<string>();
@@ -198,63 +178,108 @@ export default function LanguageTrendChart() {
   return (
     <div className="w-full rounded-xl border border-[#21262d] bg-[#0d1117] p-5 md:p-6">
       {/* ヘッダー */}
-      <div className="mb-5">
-        <h3 className="text-base font-bold text-[#e6edf3]">人気言語ランキング</h3>
-        <p className="mt-0.5 text-xs text-[#8b949e]">言語ごとの使用率の推移（直近1年）</p>
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-base font-bold text-[#e6edf3]">人気言語ランキング</h3>
+          <p className="mt-0.5 text-xs text-[#8b949e]">言語ごとの使用率の推移（直近1年）</p>
+        </div>
+        {includePrivate && (
+          <span className="flex shrink-0 items-center gap-1 rounded-full border border-[#388bfd]/30 bg-[#388bfd]/10 px-2.5 py-1 text-[11px] font-medium text-[#388bfd]">
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+            >
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            プライベート含む
+          </span>
+        )}
       </div>
 
       {/* グラフ */}
       <div style={{ height: 320, width: "100%" }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 8, right: 24, left: -4, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="1 3" stroke="#21262d" vertical={false} />
-
-            <XAxis
-              dataKey="month"
-              tick={{ fill: "#8b949e", fontSize: 11 }}
-              tickLine={false}
-              axisLine={false}
-              dy={6}
-            />
-
-            <YAxis
-              tick={{ fill: "#8b949e", fontSize: 11 }}
-              tickLine={false}
-              axisLine={false}
-              width={30}
-              unit="%"
-              domain={[0, "auto"]}
-              allowDecimals={false}
-            />
-
-            <Tooltip content={<CustomTooltip />} cursor={{ stroke: "#30363d", strokeWidth: 1 }} />
-
-            <Legend
-              content={(props) => (
-                <CustomLegend
-                  payload={props.payload as { value: string; color: string }[]}
-                  hiddenLines={hiddenLines}
-                  onToggle={toggleLine}
+        {loading ? (
+          <div className="flex h-full items-center justify-center">
+            <div className="flex items-center gap-2 text-[#636e7b]">
+              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
                 />
-              )}
-            />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+              </svg>
+              集計中...
+            </div>
+          </div>
+        ) : data.length === 0 ? (
+          <div className="flex h-full items-center justify-center">
+            <p className="text-center text-sm text-[#636e7b]">
+              トレンドデータがありません
+              <br />
+              <span className="text-xs">「今すぐ更新」を実行してください</span>
+            </p>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={data} margin={{ top: 8, right: 24, left: -4, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="1 3" stroke="#21262d" vertical={false} />
 
-            {languages.map((lang) => (
-              <Line
-                key={lang}
-                type="linear"
-                dataKey={lang}
-                stroke={GITHUB_LANGUAGE_COLORS[lang] ?? "#8b949e"}
-                strokeWidth={2.5}
-                dot={{ r: 3.5, strokeWidth: 0, fill: GITHUB_LANGUAGE_COLORS[lang] ?? "#8b949e" }}
-                activeDot={{ r: 6, stroke: "#0d1117", strokeWidth: 2 }}
-                hide={hiddenLines.has(lang)}
-                isAnimationActive={true}
-                animationDuration={500}
+              <XAxis
+                dataKey="month"
+                tick={{ fill: "#8b949e", fontSize: 11 }}
+                tickLine={false}
+                axisLine={false}
+                dy={6}
               />
-            ))}
-          </LineChart>
-        </ResponsiveContainer>
+
+              <YAxis
+                tick={{ fill: "#8b949e", fontSize: 11 }}
+                tickLine={false}
+                axisLine={false}
+                width={30}
+                unit="%"
+                domain={[0, "auto"]}
+                allowDecimals={false}
+              />
+
+              <Tooltip content={<CustomTooltip />} cursor={{ stroke: "#30363d", strokeWidth: 1 }} />
+
+              <Legend
+                content={(props) => (
+                  <CustomLegend
+                    payload={props.payload as { value: string; color: string }[]}
+                    hiddenLines={hiddenLines}
+                    onToggle={toggleLine}
+                  />
+                )}
+              />
+
+              {languages.map((lang) => (
+                <Line
+                  key={lang}
+                  type="linear"
+                  dataKey={lang}
+                  stroke={GITHUB_LANGUAGE_COLORS[lang] ?? "#8b949e"}
+                  strokeWidth={2.5}
+                  dot={{ r: 3.5, strokeWidth: 0, fill: GITHUB_LANGUAGE_COLORS[lang] ?? "#8b949e" }}
+                  activeDot={{ r: 6, stroke: "#0d1117", strokeWidth: 2 }}
+                  hide={hiddenLines.has(lang)}
+                  isAnimationActive={true}
+                  animationDuration={500}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        )}
       </div>
     </div>
   );

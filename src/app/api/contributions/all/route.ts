@@ -10,9 +10,8 @@ export async function GET(request: Request) {
     const year = yearParam ? parseInt(yearParam) : null;
 
     const users = await prisma.user.findMany({
-      include: {
-        accounts: { where: { provider: "github" } },
-      },
+      // ★ githubName を使う（name は表示名なので GitHub API では使えない）
+      select: { githubName: true },
     });
 
     const dailyCounts: Record<string, number> = {};
@@ -24,24 +23,24 @@ export async function GET(request: Request) {
 
     await Promise.all(
       users.map(async (user) => {
-        const githubUsername = user.name;
-        if (!githubUsername) return;
+        const githubName = user.githubName;
+        if (!githubName) return;
 
+        // ★ キャッシュキーも githubName ベース
         const cacheKey = year
-          ? `contributions:days:${githubUsername}:${year}`
-          : `contributions:days:${githubUsername}:latest`;
+          ? `contributions:days:${githubName}:${year}`
+          : `contributions:days:${githubName}:latest`;
 
         let days = await redis.get(cacheKey);
 
         if (!days) {
           try {
-            const data = await getContributionData(githubUsername, GITHUB_TOKEN, year ?? undefined);
+            const data = await getContributionData(githubName, GITHUB_TOKEN, year ?? undefined);
             days = data.days;
-            // 直近1年は1日、過去年は30日キャッシュ
             const ttl = year ? 86400 * 30 : 86400;
             await redis.set(cacheKey, JSON.stringify(days), { ex: ttl });
           } catch (error) {
-            console.error(`Failed to fetch contributions for ${githubUsername}:`, error);
+            console.error(`Failed to fetch contributions for ${githubName}:`, error);
             return;
           }
         } else if (typeof days === "string") {

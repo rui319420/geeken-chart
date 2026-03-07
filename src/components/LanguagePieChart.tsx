@@ -1,15 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  Sector,
-  Tooltip,
-  ResponsiveContainer,
-  type PieSectorDataItem,
-} from "recharts";
+import { PieChart, Pie, Cell, Sector, ResponsiveContainer, type PieSectorDataItem } from "recharts";
 
 const GITHUB_LANGUAGE_COLORS: Record<string, string> = {
   TypeScript: "#3178c6",
@@ -28,16 +20,18 @@ const GITHUB_LANGUAGE_COLORS: Record<string, string> = {
   Dart: "#00B4AB",
   HTML: "#e34c26",
   CSS: "#563d7c",
+  Shell: "#89e051",
+  Vue: "#42b883",
 };
 
-const getRandomColor = (seed: string) => {
+function getRandomColor(seed: string): string {
   let hash = 0;
   for (let i = 0; i < seed.length; i++) {
     hash = seed.charCodeAt(i) + ((hash << 5) - hash);
   }
   const color = Math.floor(Math.abs(((Math.sin(hash) * 10000) % 1) * 16777215)).toString(16);
   return "#" + "000000".substring(0, 6 - color.length) + color;
-};
+}
 
 const renderActiveShape = ({
   cx,
@@ -50,7 +44,6 @@ const renderActiveShape = ({
   fill,
   payload,
   percent,
-  value,
 }: PieSectorDataItem) => {
   const RADIAN = Math.PI / 180;
   const sin = Math.sin(-RADIAN * (midAngle ?? 0));
@@ -95,70 +88,42 @@ const renderActiveShape = ({
         fill="#F2F3F5"
         fontWeight="bold"
       >
-        {`コミット数: ${value}`}
+        {`${((percent ?? 0) * 100).toFixed(1)}%`}
       </text>
-      <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} dy={18} textAnchor={textAnchor} fill="#949BA4">
-        {`(割合: ${((percent ?? 0) * 100).toFixed(2)}%)`}
+      <text
+        x={ex + (cos >= 0 ? 1 : -1) * 12}
+        y={ey}
+        dy={18}
+        textAnchor={textAnchor}
+        fill="#949BA4"
+        fontSize={12}
+      >
+        {(payload as { name: string; bytes: number }).bytes
+          ? `${((payload as { bytes: number }).bytes / 1024).toFixed(0)} KB`
+          : ""}
       </text>
     </g>
   );
 };
 
-type Period = "1m" | "3m" | "1y" | "all";
-interface PieData {
+interface LangData {
   name: string;
-  value: number;
+  bytes: number;
+  percentage: number;
 }
 
-const mockData: Record<Period, PieData[]> = {
-  "1m": [
-    { name: "TypeScript", value: 450 },
-    { name: "C", value: 250 },
-    { name: "Python", value: 200 },
-    { name: "Go", value: 100 },
-  ],
-  "3m": [
-    { name: "TypeScript", value: 1200 },
-    { name: "Python", value: 900 },
-    { name: "C", value: 450 },
-    { name: "Rust", value: 300 },
-    { name: "Go", value: 150 },
-  ],
-  "1y": [
-    { name: "Python", value: 4200 },
-    { name: "TypeScript", value: 3600 },
-    { name: "JavaScript", value: 1800 },
-    { name: "C", value: 1200 },
-    { name: "Rust", value: 1200 },
-  ],
-  all: [
-    { name: "JavaScript", value: 8000 },
-    { name: "Python", value: 7500 },
-    { name: "TypeScript", value: 6000 },
-    { name: "C", value: 4500 },
-    { name: "HTML", value: 1500 },
-    { name: "CSS", value: 1500 },
-  ],
-};
-
-const periodLabels: Record<Period, string> = {
-  "1m": "直近1ヶ月",
-  "3m": "直近3ヶ月",
-  "1y": "直近1年",
-  all: "総合",
-};
-
-const INTERVAL_MS = 2000; // ループ間隔
-const INITIAL_DELAY_MS = 1000; // 初回開始までの遅延
-const RESUME_DELAY_MS = 100; // マウスが離れてから再開するまでの遅延
+const INTERVAL_MS = 2000;
+const INITIAL_DELAY_MS = 1000;
+const RESUME_DELAY_MS = 100;
 
 export default function LanguagePieChart() {
-  const [selectedPeriod, setSelectedPeriod] = useState<Period>("1m");
-  const [activeIndex, setActiveIndex] = useState<number>(0);
+  const [data, setData] = useState<LangData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [includePrivate, setIncludePrivate] = useState(false);
 
-  const currentData = mockData[selectedPeriod];
-  const dataLengthRef = useRef(currentData.length);
-  const activeIndexRef = useRef<number>(0);
+  const dataLengthRef = useRef(0);
+  const activeIndexRef = useRef(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -182,9 +147,7 @@ export default function LanguagePieChart() {
 
   const renderShape = useCallback(
     (props: PieSectorDataItem & { index?: number }) => {
-      if (props.index === activeIndex) {
-        return renderActiveShape(props);
-      }
+      if (props.index === activeIndex) return renderActiveShape(props);
       return (
         <Sector
           cx={props.cx}
@@ -200,73 +163,107 @@ export default function LanguagePieChart() {
     [activeIndex],
   );
 
-  // 期間変更・マウント時にループをリセット
+  // データ取得
   useEffect(() => {
-    dataLengthRef.current = currentData.length;
-    activeIndexRef.current = 0;
-    setActiveIndex(0);
-    startLoop(INITIAL_DELAY_MS);
+    // 設定取得（ログイン中のみ）
+    fetch("/api/user/settings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s) => s && setIncludePrivate(s.includePrivate ?? false))
+      .catch(() => {});
+
+    fetch("/api/languages/all")
+      .then((r) => r.json())
+      .then((json: LangData[]) => {
+        setData(json);
+        dataLengthRef.current = json.length;
+        activeIndexRef.current = 0;
+        setActiveIndex(0);
+        startLoop(INITIAL_DELAY_MS);
+      })
+      .catch((e) => console.error("Language fetch failed:", e))
+      .finally(() => setLoading(false));
+
     return () => stopLoop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPeriod]);
-
-  const handlePeriodChange = (period: Period) => {
-    setSelectedPeriod(period);
-  };
+  }, []);
 
   return (
     <div className="flex h-[450px] w-full flex-col rounded-xl border border-[#2ea043]/40 bg-gradient-to-br from-[#0d1117] to-[#181a26] p-4 shadow-[0_0_20px_rgba(88,101,242,0.15)] md:h-[500px] md:p-6">
-      <div className="mb-4 flex flex-col items-center justify-between gap-4 sm:flex-row">
-        <h2 className="text-xl font-bold tracking-wider text-[#F2F3F5]">言語割合（全体）</h2>
-        <div className="flex flex-wrap justify-center rounded-lg bg-[#1E1F22] p-1 shadow-inner">
-          {(Object.keys(periodLabels) as Period[]).map((period) => (
-            <button
-              key={period}
-              onClick={() => handlePeriodChange(period)}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-all duration-200 ${
-                selectedPeriod === period
-                  ? "bg-[#5865F2] text-white shadow-md"
-                  : "text-[#949BA4] hover:bg-[#2B2D31] hover:text-[#DBDEE1]"
-              }`}
-            >
-              {periodLabels[period]}
-            </button>
-          ))}
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold tracking-wider text-[#F2F3F5]">言語割合（全体）</h2>
+          <p className="mt-0.5 text-xs text-[#636e7b]">メンバー全員のコード使用量を集計</p>
         </div>
+        {includePrivate && (
+          <span className="flex items-center gap-1 rounded-full border border-[#388bfd]/30 bg-[#388bfd]/10 px-2.5 py-1 text-[11px] font-medium text-[#388bfd]">
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+            >
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            プライベート含む
+          </span>
+        )}
       </div>
 
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart margin={{ top: 20, right: 120, bottom: 0, left: 120 }}>
-          <Pie
-            data={currentData}
-            cx="50%"
-            cy="50%"
-            innerRadius="38%"
-            outerRadius="58%"
-            dataKey="value"
-            stroke="none"
-            shape={renderShape}
-            onMouseEnter={(_, index) => {
-              stopLoop();
-              setActiveIndex(index);
-              activeIndexRef.current = index;
-            }}
-            onMouseLeave={() => {
-              startLoop(RESUME_DELAY_MS);
-            }}
-          >
-            {currentData.map((entry, index) => {
-              const cellColor = GITHUB_LANGUAGE_COLORS[entry.name] || getRandomColor(entry.name);
-              return <Cell key={`cell-${index}`} fill={cellColor} />;
-            })}
-          </Pie>
-          <Tooltip
-            content={() => null}
-            defaultIndex={activeIndex}
-            key={activeIndex as number}
-          />{" "}
-        </PieChart>
-      </ResponsiveContainer>
+      {loading ? (
+        <div className="flex flex-1 items-center justify-center">
+          <div className="flex items-center gap-2 text-[#949BA4]">
+            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+            </svg>
+            集計中...
+          </div>
+        </div>
+      ) : data.length === 0 ? (
+        <div className="flex flex-1 items-center justify-center">
+          <p className="text-center text-sm text-[#636e7b]">
+            データがありません
+            <br />
+            <span className="text-xs">GitHubでログインすると自動で集計されます</span>
+          </p>
+        </div>
+      ) : (
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart margin={{ top: 20, right: 120, bottom: 0, left: 120 }}>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              innerRadius="38%"
+              outerRadius="58%"
+              dataKey="bytes"
+              stroke="none"
+              shape={renderShape}
+              onMouseEnter={(_, index) => {
+                stopLoop();
+                setActiveIndex(index);
+                activeIndexRef.current = index;
+              }}
+              onMouseLeave={() => startLoop(RESUME_DELAY_MS)}
+            >
+              {data.map((entry, index) => {
+                const color = GITHUB_LANGUAGE_COLORS[entry.name] ?? getRandomColor(entry.name);
+                return <Cell key={`cell-${index}`} fill={color} />;
+              })}
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
+      )}
     </div>
   );
 }

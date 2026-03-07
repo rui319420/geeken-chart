@@ -34,9 +34,11 @@ model User {
   showLanguages Boolean @default(true)
   joinRanking   Boolean @default(true)
   isAnonymous   Boolean @default(false)
+	includePrivate Boolean @default(false)
 
   // リレーション
   languages       UserLanguage[]
+	snapshots     LanguageSnapshot[]
   discordActivity DiscordActivity[]
 }
 
@@ -53,6 +55,17 @@ model UserLanguage {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, language]) // 同じユーザー×言語の組み合わせは1件のみ
+}
+
+model LanguageSnapshot {
+  id       String @id @default(cuid())
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  language String
+  bytes    BigInt
+  month    String // "2026-03" 形式（YYYY-MM）
+
+  @@unique([userId, language, month])
 }
 
 // ──────────────────────────────────────
