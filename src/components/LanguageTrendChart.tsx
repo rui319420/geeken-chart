@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   LineChart,
   Line,
@@ -8,140 +8,254 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
+  Legend,
 } from "recharts";
 
-// GitHubの公式カラー（Linguist）に準拠した主要言語のカラーマップ
 const GITHUB_LANGUAGE_COLORS: Record<string, string> = {
   TypeScript: "#3178c6",
   JavaScript: "#f1e05a",
   Python: "#3572A5",
-  C: "#555555",
+  C: "#9b9b9b",
   "C++": "#f34b7d",
   "C#": "#178600",
   Java: "#b07219",
   Go: "#00ADD8",
   Rust: "#dea584",
   Ruby: "#701516",
-  PHP: "#4F5D95",
-  Swift: "#F05138",
-  Kotlin: "#A97BFF",
-  Dart: "#00B4AB",
-  HTML: "#e34c26",
-  CSS: "#563d7c",
-  Vue: "#41b883",
-  Shell: "#89e051",
-  Lua: "#000080",
-  Perl: "#0298c3",
-  Haskell: "#5e5086",
-  Elixir: "#6e4a7e",
 };
 
-interface ChartData {
-  period: string;
-  [language: string]: string | number;
+interface DataPoint {
+  month: string;
+  [lang: string]: string | number;
 }
 
-const mockData: ChartData[] = [
-  { period: "1月", TypeScript: 40, C: 20, Python: 25, Go: 10, Rust: 5 },
-  { period: "2月", TypeScript: 45, C: 15, Python: 20, Go: 15, Rust: 5 },
-  { period: "3月", TypeScript: 50, C: 10, Python: 15, Go: 15, Rust: 10 },
-  { period: "4月", TypeScript: 55, C: 10, Python: 10, Go: 10, Rust: 15 },
-];
+// モックデータ生成（1年固定）
+function generateMockData(): DataPoint[] {
+  const months = 12;
+  const languages = ["TypeScript", "Python", "JavaScript", "C", "Rust"];
 
-const getRandomColor = (seed: string) => {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = seed.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const color = Math.floor(Math.abs(((Math.sin(hash) * 10000) % 1) * 16777215)).toString(16);
-  return "#" + "000000".substring(0, 6 - color.length) + color;
+  // 各言語の初期値とトレンド
+  const init: Record<string, number> = {
+    TypeScript: 38,
+    Python: 28,
+    JavaScript: 20,
+    C: 18,
+    Rust: 8,
+  };
+  const trend: Record<string, number> = {
+    TypeScript: 0.8,
+    Python: 0.3,
+    JavaScript: -0.4,
+    C: -0.2,
+    Rust: 0.5,
+  };
+
+  const now = new Date();
+  return Array.from({ length: months }, (_, i) => {
+    const d = new Date(now);
+    d.setMonth(now.getMonth() - (months - 1 - i));
+    const point: DataPoint = {
+      month: `${d.getFullYear()}/${d.getMonth() + 1}`,
+    };
+    languages.forEach((lang) => {
+      const noise = (Math.random() - 0.5) * 4;
+      point[lang] = Math.max(1, Math.round(init[lang] + trend[lang] * i + noise));
+    });
+    return point;
+  });
+}
+
+// カスタムツールチップ
+const CustomTooltip = ({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: { name?: string; value?: number; color?: string }[];
+  label?: string;
+}) => {
+  if (!active || !payload || payload.length === 0) return null;
+  const sorted = [...payload].sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+  return (
+    <div
+      style={{
+        background: "#161b22",
+        border: "1px solid #30363d",
+        borderRadius: 8,
+        padding: "10px 14px",
+        minWidth: 140,
+      }}
+    >
+      <p style={{ color: "#8b949e", fontSize: 11, margin: "0 0 8px" }}>{label}</p>
+      {sorted.map((entry) => (
+        <div
+          key={entry.name}
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 16,
+            marginBottom: 3,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: entry.color,
+                display: "inline-block",
+                flexShrink: 0,
+              }}
+            />
+            <span style={{ color: "#e6edf3", fontSize: 11 }}>{entry.name}</span>
+          </div>
+          <span style={{ color: entry.color, fontWeight: 700, fontSize: 12 }}>{entry.value}%</span>
+        </div>
+      ))}
+    </div>
+  );
 };
 
-export default function LanguageTrendChart({ data = mockData }: { data?: ChartData[] }) {
-  const activeLanguages = useMemo(() => {
-    if (!data || data.length === 0) return [];
+// カスタム凡例
+const CustomLegend = ({
+  payload,
+  hiddenLines,
+  onToggle,
+}: {
+  payload?: { value: string; color: string }[];
+  hiddenLines: Set<string>;
+  onToggle: (lang: string) => void;
+}) => {
+  if (!payload) return null;
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        gap: "6px 14px",
+        justifyContent: "flex-end",
+        paddingTop: 8,
+      }}
+    >
+      {payload.map((entry) => {
+        const hidden = hiddenLines.has(entry.value);
+        return (
+          <button
+            key={entry.value}
+            onClick={() => onToggle(entry.value)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              opacity: hidden ? 0.35 : 1,
+              transition: "opacity 0.2s",
+              padding: 0,
+            }}
+          >
+            <span
+              style={{
+                width: 20,
+                height: 2.5,
+                background: entry.color,
+                display: "inline-block",
+                borderRadius: 2,
+              }}
+            />
+            <span style={{ color: "#8b949e", fontSize: 11 }}>{entry.value}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+};
 
+export default function LanguageTrendChart() {
+  const [hiddenLines, setHiddenLines] = useState<Set<string>>(new Set());
+
+  const data = useMemo(() => generateMockData(), []);
+
+  const languages = useMemo(() => {
     const keys = new Set<string>();
-    data.forEach((item) => {
-      Object.keys(item).forEach((key) => {
-        if (key !== "period") keys.add(key);
-      });
-    });
+    data.forEach((d) => Object.keys(d).forEach((k) => k !== "month" && keys.add(k)));
     return Array.from(keys);
   }, [data]);
 
+  const toggleLine = (lang: string) => {
+    setHiddenLines((prev) => {
+      const next = new Set(prev);
+      next.has(lang) ? next.delete(lang) : next.add(lang);
+      return next;
+    });
+  };
+
   return (
-    // 【サイズ・背景の調整】
-    // 高さをPC画面向けに500pxに拡大 (md:h-[500px])
-    // GitHubのダークテーマ背景(#0d1117)からDiscordのダークトーンへのグラデーション
-    // GitHubグリーン(#2ea043)の枠線と、Discordブルー(#5865F2)のうっすらとしたシャドウを融合
-    <div className="h-[400px] w-full rounded-xl border border-[#2ea043]/40 bg-gradient-to-br from-[#0d1117] to-[#181a26] p-4 shadow-[0_0_20px_rgba(88,101,242,0.15)] md:h-[500px] md:p-6">
-      <h2 className="mb-6 text-center text-xl font-bold tracking-wider text-[#F2F3F5]">
-        言語別使用率
-      </h2>
+    <div className="w-full rounded-xl border border-[#21262d] bg-[#0d1117] p-5 md:p-6">
+      {/* ヘッダー */}
+      <div className="mb-5">
+        <h3 className="text-base font-bold text-[#e6edf3]">人気言語ランキング</h3>
+        <p className="mt-0.5 text-xs text-[#8b949e]">言語ごとの使用率の推移（直近1年）</p>
+      </div>
 
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 10, right: 30, left: -10, bottom: 10 }}>
-          {/* グリッド線：GitHubのグリーンを薄く適用 */}
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(46, 160, 67, 0.15)" />
+      {/* グラフ */}
+      <div style={{ height: 320, width: "100%" }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 8, right: 24, left: -4, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="1 3" stroke="#21262d" vertical={false} />
 
-          {/* X軸・Y軸：文字色はDiscordのMuted text色、軸線はDiscordブルーを薄く適用 */}
-          <XAxis
-            dataKey="period"
-            tick={{ fill: "#949BA4", fontSize: 13 }}
-            tickLine={false}
-            axisLine={{ stroke: "rgba(88, 101, 242, 0.4)" }}
-            dy={10}
-          />
-          <YAxis
-            unit="%"
-            tick={{ fill: "#949BA4", fontSize: 13 }}
-            tickLine={false}
-            axisLine={false}
-          />
+            <XAxis
+              dataKey="month"
+              tick={{ fill: "#8b949e", fontSize: 11 }}
+              tickLine={false}
+              axisLine={false}
+              dy={6}
+            />
 
-          {/* ツールチップ：Discordのダークパネル風にカスタマイズ（枠線はDiscordブルー） */}
-          <Tooltip
-            formatter={(value: number | undefined) => [`${value}%`, undefined]}
-            contentStyle={{
-              backgroundColor: "#1E1F22",
-              borderColor: "#5865F2",
-              color: "#F2F3F5",
-              borderRadius: "8px",
-              boxShadow: "0 8px 16px rgba(0,0,0,0.4)",
-            }}
-            itemStyle={{ color: "#F2F3F5" }}
-            labelStyle={{ color: "#949BA4", marginBottom: "4px" }}
-          />
+            <YAxis
+              tick={{ fill: "#8b949e", fontSize: 11 }}
+              tickLine={false}
+              axisLine={false}
+              width={30}
+              unit="%"
+              domain={[0, "auto"]}
+              allowDecimals={false}
+            />
 
-          {/* 凡例（Legend）：文字色をライトグレーにしてダークテーマに合わせる */}
-          <Legend
-            wrapperStyle={{ paddingTop: "20px" }}
-            formatter={(value) => (
-              <span style={{ color: "#DBDEE1", fontWeight: 500 }}>{value}</span>
-            )}
-          />
+            <Tooltip content={<CustomTooltip />} cursor={{ stroke: "#30363d", strokeWidth: 1 }} />
 
-          {activeLanguages.map((lang) => {
-            const strokeColor = GITHUB_LANGUAGE_COLORS[lang] || getRandomColor(lang);
+            <Legend
+              content={(props) => (
+                <CustomLegend
+                  payload={props.payload as { value: string; color: string }[]}
+                  hiddenLines={hiddenLines}
+                  onToggle={toggleLine}
+                />
+              )}
+            />
 
-            return (
+            {languages.map((lang) => (
               <Line
                 key={lang}
                 type="linear"
                 dataKey={lang}
-                name={lang}
-                stroke={strokeColor}
-                strokeWidth={3}
-                dot={{ r: 4, strokeWidth: 2, fill: "#0d1117" }} // ドットの中心を背景色で抜く
-                activeDot={{ r: 7, stroke: "#F2F3F5", strokeWidth: 2 }} // ホバー時のドットを強調
+                stroke={GITHUB_LANGUAGE_COLORS[lang] ?? "#8b949e"}
+                strokeWidth={2.5}
+                dot={{ r: 3.5, strokeWidth: 0, fill: GITHUB_LANGUAGE_COLORS[lang] ?? "#8b949e" }}
+                activeDot={{ r: 6, stroke: "#0d1117", strokeWidth: 2 }}
+                hide={hiddenLines.has(lang)}
+                isAnimationActive={true}
+                animationDuration={500}
               />
-            );
-          })}
-        </LineChart>
-      </ResponsiveContainer>
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
