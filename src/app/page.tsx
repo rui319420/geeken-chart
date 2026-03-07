@@ -5,6 +5,8 @@ import CombinedHeatmap from "@/components/CombinedHeatmap";
 import LanguagePieChart from "@/components/LanguagePieChart";
 import ContributionGraph from "@/components/ContributionGraph";
 import LanguageTrendChart from "@/components/LanguageTrendChart";
+import RefreshButton from "@/components/RefreshButton";
+import PrivacySettings from "@/components/PrivacySettings";
 
 // メンバー一覧（仮）
 function MemberList() {
@@ -32,6 +34,8 @@ function MemberList() {
   );
 }
 
+const isDev = process.env.NODE_ENV === "development";
+
 export default async function HomePage() {
   const session = await auth();
 
@@ -50,26 +54,48 @@ export default async function HomePage() {
           </div>
         )}
 
-        {/* StatsCards - 1カラム */}
+        {/* StatsCards */}
         <section className="mb-6">
           <StatsCards />
         </section>
 
-        {/* ヒートマップ - 1カラム */}
+        {/* ヒートマップ */}
         <section className="mb-6">
           <CombinedHeatmap />
         </section>
+
+        {/* コミット推移 */}
         <section className="mb-6">
           <ContributionGraph />
         </section>
 
-        <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* 言語割合 & メンバー一覧 */}
+        <section className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
           <LanguagePieChart />
           <MemberList />
         </section>
-        <section className="grid">
+
+        {/* 言語トレンド */}
+        <section className="mb-6">
           <LanguageTrendChart />
         </section>
+
+        {/* ログイン済みユーザー向け：プライバシー設定 */}
+        {session && (
+          <section className="mb-6">
+            <PrivacySettings />
+          </section>
+        )}
+
+        {/* 開発用：手動更新ボタン */}
+        {isDev && (
+          <section className="mt-10 border-t border-white/5 pt-8">
+            <p className="mb-3 text-xs font-semibold tracking-widest text-[#636e7b] uppercase">
+              開発用ツール
+            </p>
+            <RefreshButton />
+          </section>
+        )}
       </main>
     </div>
   );

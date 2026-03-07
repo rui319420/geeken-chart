@@ -18,11 +18,29 @@ const periodLabels: Record<Period, string> = {
   "1y": "1年",
 };
 
+interface ApiDay {
+  date: string;
+  count: number;
+  level: 0 | 1 | 2 | 3 | 4;
+}
+
 interface DayData {
   date: string;
   count: number;
   label: string;
   dayLabel: string;
+}
+
+function apiToChartData(raw: ApiDay[]): DayData[] {
+  return raw.map((d) => {
+    const dt = new Date(d.date);
+    return {
+      date: d.date,
+      count: d.count,
+      label: `${dt.getMonth() + 1}/${dt.getDate()}`,
+      dayLabel: String(dt.getDate()),
+    };
+  });
 }
 
 function filterByPeriod(data: DayData[], period: Period): DayData[] {
@@ -58,27 +76,6 @@ function filterByPeriod(data: DayData[], period: Period): DayData[] {
   return filtered;
 }
 
-function generateMockData(): DayData[] {
-  const data: DayData[] = [];
-  const now = new Date();
-  for (let i = 364; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(now.getDate() - i);
-    const dateStr = d.toISOString().split("T")[0];
-    const rand = Math.random();
-    const count = rand < 0.15 ? 0 : Math.floor(rand * 22);
-    data.push({
-      date: dateStr,
-      count,
-      label: `${d.getMonth() + 1}/${d.getDate()}`,
-      dayLabel: `${d.getDate()}`,
-    });
-  }
-  return data;
-}
-
-const MOCK_DATA = generateMockData();
-
 const CustomTooltip = ({
   active,
   payload,
@@ -107,29 +104,33 @@ const CustomTooltip = ({
   );
 };
 
-function getTickInterval(period: Period, dataLength: number): number {
-  if (period === "1m") return 1;
-  return Math.floor(dataLength / 18);
-}
-
 export default function ContributionGraph() {
   const [period, setPeriod] = useState<Period>("1m");
-  const data = useMemo(() => filterByPeriod(MOCK_DATA, period), [period]);
+  const [rawData, setRawData] = useState<DayData[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isVisible, setIsVisible] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // 全期間データを1回だけ取得（ブラウザ側でフィルタ）
   useEffect(() => {
+    fetch("/api/contributions/all")
+      .then((r) => r.json())
+      .then((json: ApiDay[]) => setRawData(apiToChartData(json)))
+      .catch((e) => console.error("Contributions fetch failed:", e))
+      .finally(() => setLoading(false));
+
     const t = setTimeout(() => setIsVisible(true), 100);
     return () => clearTimeout(t);
   }, []);
 
-  const maxCount = data.length > 0 ? Math.max(...data.map((d) => d.count)) : 0;
-  const tickInterval = getTickInterval(period, data.length);
+  const data = useMemo(() => filterByPeriod(rawData, period), [rawData, period]);
+
+  const maxCount = data.length > 0 ? Math.max(...data.map((d) => d.count)) : 10;
+  const tickInterval = period === "1y" ? Math.floor(data.length / 18) : 1;
 
   return (
     <div
       ref={containerRef}
-      className="w-full"
       style={{
         background: "#0d1117",
         borderRadius: 12,
@@ -150,13 +151,9 @@ export default function ContributionGraph() {
           gap: 12,
         }}
       >
-        <div>
-          <p style={{ color: "#e6edf3", fontWeight: 700, fontSize: 14, margin: 0 }}>
-            コミット推移（全体）
-          </p>
-        </div>
-
-        {/* 期間タブ */}
+        <p style={{ color: "#e6edf3", fontWeight: 700, fontSize: 14, margin: 0 }}>
+          コミット推移（全体）
+        </p>
         <div style={{ display: "flex", background: "#161b22", borderRadius: 8, padding: 2 }}>
           {(Object.keys(periodLabels) as Period[]).map((p) => (
             <button
@@ -182,68 +179,84 @@ export default function ContributionGraph() {
 
       {/* グラフ */}
       <div style={{ height: 220, width: "100%" }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 16 }}>
-            {/* 点線グリッド（画像に忠実） */}
-            <CartesianGrid
-              strokeDasharray="1 3"
-              stroke="#30363d"
-              vertical={true}
-              horizontal={true}
-            />
-
-            <XAxis
-              dataKey={period === "1m" ? "dayLabel" : "label"}
-              tick={{ fill: "#8b949e", fontSize: 11 }}
-              tickLine={false}
-              axisLine={false}
-              interval={period === "1y" ? tickInterval : 0}
-              dy={5}
-              label={{
-                value: "Days",
-                position: "insideBottom",
-                offset: -6,
-                fill: "#8b949e",
-                fontSize: 11,
+        {loading ? (
+          <div
+            style={{
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                color: "#8b949e",
+                fontSize: 13,
               }}
-            />
-
-            <YAxis
-              tick={{ fill: "#8b949e", fontSize: 11 }}
-              tickLine={false}
-              axisLine={false}
-              width={28}
-              domain={[0, Math.ceil(maxCount * 1.15) || 10]}
-              allowDecimals={false}
-              tickCount={6}
-              label={{
-                value: "",
-                angle: -90,
-                position: "insideLeft",
-                offset: 12,
-                fill: "#8b949e",
-                fontSize: 11,
-              }}
-            />
-
-            <Tooltip
-              content={<CustomTooltip />}
-              cursor={{ stroke: "#58a6ff", strokeWidth: 1, strokeDasharray: "4 3" }}
-            />
-
-            <Line
-              type="monotone"
-              dataKey="count"
-              stroke="#3fb950"
-              strokeWidth={2.5}
-              dot={{ r: 3.5, fill: "#8b949e", stroke: "#8b949e", strokeWidth: 0 }}
-              activeDot={{ r: 6, fill: "#3fb950", stroke: "#0d1117", strokeWidth: 2 }}
-              isAnimationActive={true}
-              animationDuration={500}
-              animationEasing="ease-out"
-            />
-          </LineChart>
-        </ResponsiveContainer>
+            >
+              <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+              </svg>
+              集計中...
+            </div>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 16 }}>
+              <CartesianGrid strokeDasharray="1 3" stroke="#30363d" />
+              <XAxis
+                dataKey={period === "1m" ? "dayLabel" : "label"}
+                tick={{ fill: "#8b949e", fontSize: 11 }}
+                tickLine={false}
+                axisLine={false}
+                interval={period === "1y" ? tickInterval : 0}
+                dy={5}
+                label={{
+                  value: "Days",
+                  position: "insideBottom",
+                  offset: -6,
+                  fill: "#8b949e",
+                  fontSize: 11,
+                }}
+              />
+              <YAxis
+                tick={{ fill: "#8b949e", fontSize: 11 }}
+                tickLine={false}
+                axisLine={false}
+                width={28}
+                domain={[0, Math.ceil(maxCount * 1.15) || 10]}
+                allowDecimals={false}
+                tickCount={6}
+              />
+              <Tooltip
+                content={<CustomTooltip />}
+                cursor={{ stroke: "#58a6ff", strokeWidth: 1, strokeDasharray: "4 3" }}
+              />
+              <Line
+                type="monotone"
+                dataKey="count"
+                stroke="#3fb950"
+                strokeWidth={2.5}
+                dot={{ r: 3.5, fill: "#8b949e", stroke: "#8b949e", strokeWidth: 0 }}
+                activeDot={{ r: 6, fill: "#3fb950", stroke: "#0d1117", strokeWidth: 2 }}
+                isAnimationActive
+                animationDuration={500}
+                animationEasing="ease-out"
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
       </div>
     </div>
   );
