@@ -4,6 +4,7 @@ import StatsCards from "@/components/StatsCards";
 import CombinedHeatmap from "@/components/CombinedHeatmap";
 import LanguagePieChart from "@/components/LanguagePieChart";
 import ContributionGraph from "@/components/ContributionGraph";
+import LanguageTrendChart from "@/components/LanguageTrendChart";
 
 // メンバー一覧（仮）
 function MemberList() {
@@ -65,6 +66,9 @@ export default async function HomePage() {
         <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <LanguagePieChart />
           <MemberList />
+        </section>
+        <section className="grid">
+          <LanguageTrendChart />
         </section>
       </main>
     </div>

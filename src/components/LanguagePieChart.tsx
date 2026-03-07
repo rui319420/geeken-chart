@@ -95,7 +95,7 @@ const renderActiveShape = ({
         fill="#F2F3F5"
         fontWeight="bold"
       >
-        {`使用量: ${value}`}
+        {`コミット数: ${value}`}
       </text>
       <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} dy={18} textAnchor={textAnchor} fill="#949BA4">
         {`(割合: ${((percent ?? 0) * 100).toFixed(2)}%)`}

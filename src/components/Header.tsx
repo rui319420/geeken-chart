@@ -7,22 +7,11 @@ export default function Header() {
   const { data: session, status } = useSession();
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-white/5 bg-[#0d1117]/80 backdrop-blur-md">
+    <header className="w-full border-b border-white/5 bg-[#0d1117]">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 md:px-6">
         {/* ロゴ */}
         <div className="flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#2ea043]">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="white"
-              strokeWidth="2.5"
-            >
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-            </svg>
-          </div>
+          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#2ea043]">技</div>
           <span className="text-sm font-bold tracking-widest text-[#F2F3F5]">技研チャート</span>
         </div>
 
@@ -34,15 +23,15 @@ export default function Header() {
             <>
               {/* アバター + 名前 */}
               <div className="flex items-center gap-2">
-                {/* {session.user?.image && (
-                  // <Image
-                  //   src={session.user.image}
-                  //   alt={session.user.name ?? ""}
-                  //   width={28}
-                  //   height={28}
-                  //   className="rounded-full ring-1 ring-white/10"
-                  // />
-                )} */}
+                {session.user?.image && (
+                  <Image
+                    src={session.user.image}
+                    alt={session.user.name ?? ""}
+                    width={28}
+                    height={28}
+                    className="rounded-full ring-1 ring-white/10"
+                  />
+                )}
                 <span className="hidden text-sm text-[#949BA4] sm:block">{session.user?.name}</span>
               </div>
               {/* ログアウト */}
