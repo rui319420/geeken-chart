@@ -9,6 +9,7 @@ interface SettingsBody {
   showLanguages?: boolean;
   joinRanking?: boolean;
   isAnonymous?: boolean;
+  nickname?: string;
 }
 
 export async function PATCH(request: Request) {
@@ -19,8 +20,14 @@ export async function PATCH(request: Request) {
 
   const body: SettingsBody = await request.json();
 
-  // 許可するフィールドのみ更新
-  const allowedFields: (keyof SettingsBody)[] = [
+  const data: Partial<SettingsBody> = {};
+
+  if (typeof body.nickname === "string") {
+    data.nickname = body.nickname;
+  }
+
+  // booleanのフィールドだけを配列にまとめる
+  const booleanFields: (keyof Omit<SettingsBody, "nickname">)[] = [
     "includePrivate",
     "showCommits",
     "showLanguages",
@@ -28,13 +35,11 @@ export async function PATCH(request: Request) {
     "isAnonymous",
   ];
 
-  const data: Partial<SettingsBody> = {};
-  for (const key of allowedFields) {
+  for (const key of booleanFields) {
     if (typeof body[key] === "boolean") {
       data[key] = body[key];
     }
   }
-
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "No valid fields provided" }, { status: 400 });
   }
@@ -48,6 +53,7 @@ export async function PATCH(request: Request) {
       showLanguages: true,
       joinRanking: true,
       isAnonymous: true,
+      nickname: true,
     },
   });
 
@@ -83,6 +89,7 @@ export async function GET() {
       showLanguages: true,
       joinRanking: true,
       isAnonymous: true,
+      nickname: true,
     },
   });
 
