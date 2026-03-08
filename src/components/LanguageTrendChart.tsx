@@ -16,13 +16,21 @@ const GITHUB_LANGUAGE_COLORS: Record<string, string> = {
   TypeScript: "#3178c6",
   JavaScript: "#f1e05a",
   Python: "#3572A5",
-  C: "#9b9b9b",
+  C: "#555555",
   "C++": "#f34b7d",
   "C#": "#178600",
   Java: "#b07219",
   Go: "#00ADD8",
   Rust: "#dea584",
   Ruby: "#701516",
+  PHP: "#4F5D95",
+  Swift: "#F05138",
+  Kotlin: "#A97BFF",
+  Dart: "#00B4AB",
+  HTML: "#e34c26",
+  CSS: "#563d7c",
+  Shell: "#89e051",
+  Vue: "#42b883",
 };
 
 interface DataPoint {
@@ -181,24 +189,47 @@ export default function LanguageTrendChart() {
       <div className="mb-5 flex items-start justify-between gap-3">
         <div>
           <h3 className="text-base font-bold text-[#e6edf3]">人気言語ランキング</h3>
-          <p className="mt-0.5 text-xs text-[#8b949e]">言語ごとの使用率の推移（直近1年）</p>
+          <p className="mt-0.5 text-xs text-[#8b949e]">
+            {includePrivate
+              ? "公開・プライベート含む使用率の推移（直近1年・GitHub Linguist）"
+              : "公開リポジトリの使用率の推移（直近1年・GitHub Linguist）"}
+          </p>
         </div>
-        {includePrivate && (
-          <span className="flex shrink-0 items-center gap-1 rounded-full border border-[#388bfd]/30 bg-[#388bfd]/10 px-2.5 py-1 text-[11px] font-medium text-[#388bfd]">
+        <div className="flex shrink-0 items-center gap-2">
+          {includePrivate && (
+            <span className="flex items-center gap-1 rounded-full border border-[#388bfd]/30 bg-[#388bfd]/10 px-2.5 py-1 text-[11px] font-medium text-[#388bfd]">
+              <svg
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+              >
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              プライベート含む
+            </span>
+          )}
+          <span
+            className="cursor-help text-[#636e7b]"
+            title="各リポジトリの作成日を使い、その月末時点で存在していたリポジトリをGitHub Linguistで集計しています。後から参加したユーザーでも即座に過去データが生成されます。"
+          >
             <svg
-              width="10"
-              height="10"
+              width="13"
+              height="13"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth="2.5"
+              strokeWidth="2"
             >
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
-            プライベート含む
           </span>
-        )}
+        </div>
       </div>
 
       {/* グラフ */}
@@ -223,9 +254,13 @@ export default function LanguageTrendChart() {
         ) : data.length === 0 ? (
           <div className="flex h-full items-center justify-center">
             <p className="text-center text-sm text-[#636e7b]">
-              トレンドデータがありません
+              履歴データがありません
               <br />
-              <span className="text-xs">「今すぐ更新」を実行してください</span>
+              <span className="text-xs">
+                「今すぐ更新」を実行するとリポジトリの作成日を元に
+                <br />
+                過去12ヶ月分のデータが自動生成されます
+              </span>
             </p>
           </div>
         ) : (

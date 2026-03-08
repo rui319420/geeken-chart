@@ -21,6 +21,7 @@ export interface GitHubRepo {
   description: string | null;
   stargazers_count: number;
   updated_at: string;
+  created_at: string;
 }
 
 /** /repos/{owner}/{repo}/languages レスポンス: { "TypeScript": 12345, "CSS": 678 } */
@@ -131,12 +132,18 @@ export async function fetchUserRepos(
   let page = 1;
   const perPage = 100; // GitHub API の上限
 
-  console.log(`[fetchUserRepos] Fetching repos for "${username}" ...`);
+  console.log(
+    `[fetchUserRepos] Fetching repos for "${username}" (includePrivate=${includePrivate}) ...`,
+  );
 
   while (true) {
-    const url =
-      `https://api.github.com/users/${username}/repos` +
-      `?per_page=${perPage}&page=${page}&type=owner&sort=updated`;
+    // ─────────────────────────────────────────────────────────────────
+    // /users/{username}/repos は公開リポジトリのみ返す（トークン有無に関係なく）
+    // プライベートを含める場合は /user/repos（認証ユーザー自身用）を使う
+    // ─────────────────────────────────────────────────────────────────
+    const url = includePrivate
+      ? `https://api.github.com/user/repos?per_page=${perPage}&page=${page}&affiliation=owner&sort=updated`
+      : `https://api.github.com/users/${username}/repos?per_page=${perPage}&page=${page}&type=owner&sort=updated`;
 
     const res = await githubFetch(url, token);
     const repos: GitHubRepo[] = await res.json();
@@ -146,6 +153,7 @@ export async function fetchUserRepos(
     // フォーク / プライベートのフィルタ
     const filtered = repos.filter((r) => {
       if (!includeForks && r.fork) return false;
+      // includePrivate=false のとき公開のみ（念のため二重チェック）
       if (!includePrivate && r.private) return false;
       return true;
     });
@@ -283,21 +291,3 @@ export function formatReport(report: UserLanguageReport): string {
   lines.push(`═══════════════════════════════════════════`);
   return lines.join("\n");
 }
-
-// ─────────────────────────────────────────────
-// 使用例（直接実行用）
-// ─────────────────────────────────────────────
-
-// Node.js / Deno / Bun から直接実行する場合
-// ts-node github-language-stats.ts
-//
-// または import して使う場合:
-// import { getUserLanguageStats, formatReport } from "./github-language-stats";
-//
-// const report = await getUserLanguageStats("torvalds", {
-//   token: process.env.GITHUB_TOKEN,  // PAT（任意）
-//   includeForks: false,
-//   concurrency: 5,
-// });
-// console.log(formatReport(report));
-// console.log(JSON.stringify(report.stats, null, 2));
