@@ -192,7 +192,11 @@ export default function LanguagePieChart() {
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold tracking-wider text-[#F2F3F5]">言語割合（全体）</h2>
-          <p className="mt-0.5 text-xs text-[#636e7b]">メンバー全員のコード使用量を集計</p>
+          <p className="mt-0.5 text-xs text-[#636e7b]">
+            {includePrivate
+              ? "公開・プライベート含むコード使用量を集計（GitHub Linguist）"
+              : "公開リポジトリのコード使用量を集計（GitHub Linguist）"}
+          </p>
         </div>
         {includePrivate && (
           <span className="flex items-center gap-1 rounded-full border border-[#388bfd]/30 bg-[#388bfd]/10 px-2.5 py-1 text-[11px] font-medium text-[#388bfd]">

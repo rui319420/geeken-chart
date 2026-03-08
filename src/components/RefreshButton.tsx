@@ -6,6 +6,7 @@ interface RefreshResult {
   username: string;
   languages: number;
   commits: number;
+  snapshotMonths: number;
   usedPrivateToken: boolean;
   error?: string;
 }
@@ -160,6 +161,7 @@ export default function RefreshButton() {
                   <th className="px-3 py-2 text-left font-medium">ユーザー</th>
                   <th className="px-3 py-2 text-right font-medium">言語</th>
                   <th className="px-3 py-2 text-right font-medium">コミット</th>
+                  <th className="px-3 py-2 text-right font-medium">履歴</th>
                   <th className="px-3 py-2 text-left font-medium">状態</th>
                 </tr>
               </thead>
@@ -178,6 +180,7 @@ export default function RefreshButton() {
                     <td className="px-3 py-2 text-right text-[#8b949e]">
                       {r.commits.toLocaleString()}
                     </td>
+                    <td className="px-3 py-2 text-right text-[#8b949e]">{r.snapshotMonths}ヶ月</td>
                     <td className="px-3 py-2">
                       {r.error ? (
                         <span className="text-red-400" title={r.error}>
