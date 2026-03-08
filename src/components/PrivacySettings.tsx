@@ -106,7 +106,7 @@ export default function PrivacySettings() {
       const res = await fetch("/api/user/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nickname }),
+        body: JSON.stringify({ nickname: nickname.trim() }),
       });
       if (!res.ok) throw new Error("Failed");
       setMessage("ニックネームを保存しました");
@@ -173,6 +173,7 @@ export default function PrivacySettings() {
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
                 placeholder="新しい名前"
+                maxLength={20}
                 className="rounded-md border border-white/10 bg-[#0d1117] px-3 py-1.5 text-sm text-[#e6edf3] focus:border-[#388bfd] focus:ring-1 focus:ring-[#388bfd] focus:outline-none"
               />
               <button

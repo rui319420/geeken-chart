@@ -12,6 +12,15 @@ interface SettingsBody {
   nickname?: string;
 }
 
+const userSettingsSelect = {
+  includePrivate: true,
+  showCommits: true,
+  showLanguages: true,
+  joinRanking: true,
+  isAnonymous: true,
+  nickname: true,
+};
+
 export async function PATCH(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -23,7 +32,14 @@ export async function PATCH(request: Request) {
   const data: Partial<SettingsBody> = {};
 
   if (typeof body.nickname === "string") {
-    data.nickname = body.nickname;
+    const trimmedNickname = body.nickname.trim();
+    if (trimmedNickname.length > 20) {
+      return NextResponse.json(
+        { error: "ニックネームは20文字以内で入力してください" },
+        { status: 400 },
+      );
+    }
+    data.nickname = trimmedNickname;
   }
 
   // booleanのフィールドだけを配列にまとめる
@@ -47,14 +63,7 @@ export async function PATCH(request: Request) {
   const updated = await prisma.user.update({
     where: { id: session.user.id },
     data,
-    select: {
-      includePrivate: true,
-      showCommits: true,
-      showLanguages: true,
-      joinRanking: true,
-      isAnonymous: true,
-      nickname: true,
-    },
+    select: userSettingsSelect,
   });
 
   // includePrivate が変わったら言語キャッシュをクリア
@@ -83,14 +92,7 @@ export async function GET() {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: {
-      includePrivate: true,
-      showCommits: true,
-      showLanguages: true,
-      joinRanking: true,
-      isAnonymous: true,
-      nickname: true,
-    },
+    select: userSettingsSelect,
   });
 
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
