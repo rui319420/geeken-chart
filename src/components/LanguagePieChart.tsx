@@ -166,9 +166,10 @@ export default function LanguagePieChart() {
   // 1. 設定取得
   useEffect(() => {
     fetch("/api/user/settings", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : {}))
-      .then((s) => setIncludePrivate(s.includePrivate ?? false))
-      .catch(() => setIncludePrivate(false));
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s: { includePrivate?: boolean } | null) =>
+        setIncludePrivate(s?.includePrivate ?? false),
+      );
   }, []);
 
   // データ取得

@@ -157,9 +157,10 @@ export default function LanguageTrendChart() {
   // 1. 設定取得
   useEffect(() => {
     fetch("/api/user/settings", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : {}))
-      .then((s) => setIncludePrivate(s.includePrivate ?? false))
-      .catch(() => setIncludePrivate(false));
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s: { includePrivate?: boolean } | null) =>
+        setIncludePrivate(s?.includePrivate ?? false),
+      );
   }, []);
 
   // 2. データ取得（設定確定後に実行）
@@ -324,7 +325,7 @@ export default function LanguageTrendChart() {
                   dataKey={lang}
                   stroke={GITHUB_LANGUAGE_COLORS[lang] ?? "#8b949e"}
                   strokeWidth={2.5}
-                  dot={{ r: 3.5, strokeWidth: 0, fill: GITHUB_LANGUAGE_COLORS[lang] ?? "#8b949e" }}
+                  dot={{ r: 5, strokeWidth: 0, fill: GITHUB_LANGUAGE_COLORS[lang] ?? "#8b949e" }}
                   activeDot={{ r: 6, stroke: "#0d1117", strokeWidth: 2 }}
                   hide={hiddenLines.has(lang)}
                   isAnimationActive={true}
