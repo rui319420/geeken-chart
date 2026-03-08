@@ -32,7 +32,9 @@ export default function Header() {
                     className="rounded-full ring-1 ring-white/10"
                   />
                 )}
-                <span className="hidden text-sm text-[#949BA4] sm:block">{session.user?.name}</span>
+                <span className="hidden text-sm text-[#949BA4] sm:block">
+                  {session.user?.nickname || session.user?.name}
+                </span>
               </div>
               {/* ログアウト */}
               <button
