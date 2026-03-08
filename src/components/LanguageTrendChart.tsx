@@ -152,22 +152,42 @@ export default function LanguageTrendChart() {
   const [hiddenLines, setHiddenLines] = useState<Set<string>>(new Set());
   const [data, setData] = useState<DataPoint[]>([]);
   const [loading, setLoading] = useState(true);
-  const [includePrivate, setIncludePrivate] = useState(false);
+  const [includePrivate, setIncludePrivate] = useState<boolean | null>(null);
 
+  // 1. 設定取得
   useEffect(() => {
-    // 設定取得（ログイン中のみ）
-    fetch("/api/user/settings")
+    fetch("/api/user/settings", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((s) => s && setIncludePrivate(s.includePrivate ?? false))
-      .catch(() => {});
-
-    // 言語トレンドAPI
-    fetch("/api/languages/trend")
-      .then((r) => r.json())
-      .then((json: DataPoint[]) => setData(json))
-      .catch((e) => console.error("Trend fetch failed:", e))
-      .finally(() => setLoading(false));
+      .then((s: { includePrivate?: boolean } | null) =>
+        setIncludePrivate(s?.includePrivate ?? false),
+      );
   }, []);
+
+  // 2. データ取得（設定確定後に実行）
+  useEffect(() => {
+    if (includePrivate === null) return; // 設定取得待ち
+
+    const fetchData = async () => {
+      try {
+        const params = new URLSearchParams();
+        if (includePrivate) params.set("includePrivate", "true");
+        params.set("t", Date.now().toString());
+
+        // 言語トレンドAPI
+        const res = await fetch(`/api/languages/trend?${params.toString()}`, {
+          cache: "no-store",
+        });
+        const json: DataPoint[] = await res.json();
+        setData(json);
+      } catch (e) {
+        console.error("Trend fetch failed:", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [includePrivate]);
 
   const languages = useMemo(() => {
     const keys = new Set<string>();
@@ -305,7 +325,7 @@ export default function LanguageTrendChart() {
                   dataKey={lang}
                   stroke={GITHUB_LANGUAGE_COLORS[lang] ?? "#8b949e"}
                   strokeWidth={2.5}
-                  dot={{ r: 3.5, strokeWidth: 0, fill: GITHUB_LANGUAGE_COLORS[lang] ?? "#8b949e" }}
+                  dot={{ r: 5, strokeWidth: 0, fill: GITHUB_LANGUAGE_COLORS[lang] ?? "#8b949e" }}
                   activeDot={{ r: 6, stroke: "#0d1117", strokeWidth: 2 }}
                   hide={hiddenLines.has(lang)}
                   isAnimationActive={true}

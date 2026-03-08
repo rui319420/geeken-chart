@@ -120,7 +120,7 @@ export default function LanguagePieChart() {
   const [data, setData] = useState<LangData[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [includePrivate, setIncludePrivate] = useState(false);
+  const [includePrivate, setIncludePrivate] = useState<boolean | null>(null);
 
   const dataLengthRef = useRef(0);
   const activeIndexRef = useRef(0);
@@ -163,29 +163,46 @@ export default function LanguagePieChart() {
     [activeIndex],
   );
 
+  // 1. 設定取得
+  useEffect(() => {
+    fetch("/api/user/settings", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s: { includePrivate?: boolean } | null) =>
+        setIncludePrivate(s?.includePrivate ?? false),
+      );
+  }, []);
+
   // データ取得
   useEffect(() => {
-    // 設定取得（ログイン中のみ）
-    fetch("/api/user/settings")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((s) => s && setIncludePrivate(s.includePrivate ?? false))
-      .catch(() => {});
+    if (includePrivate === null) return; // 設定取得待ち
 
-    fetch("/api/languages/all")
-      .then((r) => r.json())
-      .then((json: LangData[]) => {
+    const fetchData = async () => {
+      try {
+        const params = new URLSearchParams();
+        if (includePrivate) params.set("includePrivate", "true");
+        params.set("t", Date.now().toString());
+
+        const res = await fetch(`/api/languages/all?${params.toString()}`, {
+          cache: "no-store",
+        });
+        const json: LangData[] = await res.json();
         setData(json);
         dataLengthRef.current = json.length;
         activeIndexRef.current = 0;
         setActiveIndex(0);
         startLoop(INITIAL_DELAY_MS);
-      })
-      .catch((e) => console.error("Language fetch failed:", e))
-      .finally(() => setLoading(false));
+      } catch (e) {
+        console.error("Language fetch failed:", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
 
     return () => stopLoop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [includePrivate, startLoop]);
 
   return (
     <div className="flex h-[450px] w-full flex-col rounded-xl border border-[#2ea043]/40 bg-gradient-to-br from-[#0d1117] to-[#181a26] p-4 shadow-[0_0_20px_rgba(88,101,242,0.15)] md:h-[500px] md:p-6">
