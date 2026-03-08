@@ -14,7 +14,7 @@
 const GITHUB_API = "https://api.github.com";
 const TOP_LANGUAGES = 5;
 
-const EXCLUDED_LANGUAGES = new Set(["ShaderLab", "HLSL", "GLSL"]);
+const EXCLUDED_LANGUAGES = new Set(["ShaderLab", "HLSL", "GLSL", "Jupyter Notebook"]);
 
 export interface MonthlySnapshot {
   /** "2026-03" 形式 */

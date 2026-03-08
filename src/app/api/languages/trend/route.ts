@@ -6,7 +6,7 @@ const CACHE_KEY = "languages:trend";
 const CACHE_TTL = 60 * 60 * 6; // 6時間
 const MONTHS_BACK = 12;
 
-const EXCLUDED_LANGUAGES = new Set(["ShaderLab", "HLSL", "GLSL"]);
+const EXCLUDED_LANGUAGES = new Set(["ShaderLab", "HLSL", "GLSL", "Jupyter Notebook"]);
 
 export async function GET() {
   // ──────────────────────────────────────
@@ -38,7 +38,7 @@ export async function GET() {
   // 月 × 言語 ごとに bytes を合算
   const byMonth: Record<string, Record<string, number>> = {};
   for (const row of snapshots) {
-    if (EXCLUDED_LANGUAGES.has(row.language)) continue; // ★
+    if (EXCLUDED_LANGUAGES.has(row.language)) continue;
     if (!byMonth[row.month]) byMonth[row.month] = {};
     byMonth[row.month][row.language] = (byMonth[row.month][row.language] ?? 0) + Number(row.bytes);
   }

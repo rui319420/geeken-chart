@@ -8,7 +8,7 @@
  */
 
 // 集計から除外する言語
-const EXCLUDED_LANGUAGES = new Set(["ShaderLab", "HLSL", "GLSL"]);
+const EXCLUDED_LANGUAGES = new Set(["ShaderLab", "HLSL", "GLSL", "Jupyter Notebook"]);
 
 // ─────────────────────────────────────────────
 // 型定義
