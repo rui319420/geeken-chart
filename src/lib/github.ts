@@ -7,6 +7,9 @@
  *  - 言語ごとのバイト数を横断集計し、割合付きで返す
  */
 
+// 集計から除外する言語
+const EXCLUDED_LANGUAGES = new Set(["ShaderLab", "HLSL", "GLSL"]);
+
 // ─────────────────────────────────────────────
 // 型定義
 // ─────────────────────────────────────────────
@@ -227,7 +230,7 @@ export async function getUserLanguageStats(
   let analyzedRepos = 0;
 
   languageResults.forEach((langBytes) => {
-    const keys = Object.keys(langBytes);
+    const keys = Object.keys(langBytes).filter((lang) => !EXCLUDED_LANGUAGES.has(lang)); // ★
     if (keys.length > 0) analyzedRepos++;
 
     keys.forEach((lang) => {

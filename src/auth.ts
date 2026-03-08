@@ -9,6 +9,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     GitHub({
       clientId: process.env.GITHUB_ID,
       clientSecret: process.env.GITHUB_SECRET,
+      authorization: {
+        params: {
+          scope: "read:user user:email repo",
+        },
+      },
       profile(profile) {
         return {
           id: profile.id.toString(),
@@ -39,6 +44,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             githubName: (profile.login as string) || "",
             avatarUrl: (profile.avatar_url as string) || "",
           },
+        });
+
+        if (account.access_token) {
+          await prisma.account.updateMany({
+            where: { userId: user.id, provider: "github" },
+            data: { access_token: account.access_token },
+          });
+        }
+      }
+    },
+    async signOut(message) {
+      if ("session" in message && message.session?.userId) {
+        await prisma.account.updateMany({
+          where: { userId: message.session.userId, provider: "github" },
+          data: { access_token: null },
         });
       }
     },

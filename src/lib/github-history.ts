@@ -14,6 +14,8 @@
 const GITHUB_API = "https://api.github.com";
 const TOP_LANGUAGES = 5;
 
+const EXCLUDED_LANGUAGES = new Set(["ShaderLab", "HLSL", "GLSL"]);
+
 export interface MonthlySnapshot {
   /** "2026-03" 形式 */
   month: string;
@@ -191,6 +193,8 @@ async function fetchLanguagesWithConcurrency(
           });
           if (!res.ok) return { repo, langBytes: {} };
           const langBytes: LanguageBytes = await res.json();
+          // ★ 除外言語を削除
+          for (const lang of EXCLUDED_LANGUAGES) delete langBytes[lang];
           return { repo, langBytes };
         } catch {
           return { repo, langBytes: {} };
