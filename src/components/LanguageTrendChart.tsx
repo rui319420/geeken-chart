@@ -211,8 +211,8 @@ export default function LanguageTrendChart() {
           <h3 className="text-base font-bold text-[#e6edf3]">人気言語ランキング</h3>
           <p className="mt-0.5 text-xs text-[#8b949e]">
             {includePrivate
-              ? "公開・プライベート含む使用率の推移（直近1年・GitHub Linguist）"
-              : "公開リポジトリの使用率の推移（直近1年・GitHub Linguist）"}
+              ? "公開・プライベート含む使用率の推移（直近1年）"
+              : "公開リポジトリの使用率の推移（直近1年）"}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -234,7 +234,7 @@ export default function LanguageTrendChart() {
           )}
           <span
             className="cursor-help text-[#636e7b]"
-            title="各リポジトリの作成日を使い、その月末時点で存在していたリポジトリをGitHub Linguistで集計しています。後から参加したユーザーでも即座に過去データが生成されます。"
+            title="各リポジトリの作成日を使い、その月末時点で存在していたリポジトリをGitHub Linguistで集計しています。"
           >
             <svg
               width="13"
