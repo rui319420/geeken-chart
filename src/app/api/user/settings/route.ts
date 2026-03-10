@@ -68,7 +68,8 @@ export async function PATCH(request: Request) {
 
   // includePrivate が変わったら言語キャッシュをクリア
   if ("includePrivate" in data || "showLanguages" in data) {
-    await redis.del("languages:all:aggregated");
+    await redis.del("languages:all:aggregated:total");
+    await redis.del("languages:all:aggregated:average");
     await redis.del("stats:dashboard");
 
     // ユーザー自身の言語キャッシュもクリア（次回リフレッシュで再取得）
