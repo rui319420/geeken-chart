@@ -143,7 +143,8 @@ export async function POST() {
   // ──────────────────────────────────────────────────────────────────
   await Promise.all([
     redis.del("stats:dashboard"),
-    redis.del("languages:all:aggregated"),
+    redis.del("languages:all:aggregated:total"),
+    redis.del("languages:all:aggregated:average"),
     redis.del("languages:trend"),
     ...users.map((u) => redis.del(`repos:count:${u.githubName}`)),
   ]);
