@@ -57,9 +57,8 @@ const renderActiveShape = ({
   const textAnchor = cos >= 0 ? "start" : "end";
 
   // KBの表示（バイト数が0の場合は非表示）
-  const bytesText = (payload as { bytes: number }).bytes
-    ? `${((payload as { bytes: number }).bytes / 1024).toFixed(0)} KB`
-    : "";
+  const payloadData = payload as { bytes?: number };
+  const bytesText = payloadData.bytes ? `${(payloadData.bytes / 1024).toFixed(0)} KB` : "";
 
   return (
     <g>
@@ -113,7 +112,7 @@ const renderActiveShape = ({
 
 interface LangData {
   name: string;
-  bytes: number;
+  bytes?: number;
   percentage: number;
 }
 

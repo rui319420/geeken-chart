@@ -8,13 +8,13 @@ const TTL = 60 * 60 * 6; // 6時間
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const mode = searchParams.get("mode") || "total"; // "total" または "average"
+    const mode = searchParams.get("mode") === "average" ? "average" : "total";
 
     // モードによってキャッシュキーを分ける
     const CACHE_KEY = `languages:all:aggregated:${mode}`;
 
     const cached =
-      await redis.get<{ name: string; bytes: number; percentage: number }[]>(CACHE_KEY);
+      await redis.get<{ name: string; bytes?: number; percentage: number }[]>(CACHE_KEY);
     if (cached) return NextResponse.json(cached);
 
     const GITHUB_TOKEN = process.env.GITHUB_ACCESS_TOKEN;
@@ -84,7 +84,6 @@ export async function GET(request: Request) {
       result = Object.entries(scoreMap)
         .map(([name, score]) => ({
           name,
-          bytes: 0,
           percentage: validUserCount > 0 ? Math.round((score / validUserCount) * 1000) / 10 : 0,
         }))
         .sort((a, b) => b.percentage - a.percentage)
