@@ -66,13 +66,11 @@ export async function PATCH(request: Request) {
     select: userSettingsSelect,
   });
 
-  // includePrivate が変わったら言語キャッシュをクリア
+  // 言語関連の設定が変わったら、言語グラフのキャッシュと個人の言語データを消す
   if ("includePrivate" in data || "showLanguages" in data) {
     await redis.del("languages:all:aggregated:total");
     await redis.del("languages:all:aggregated:average");
-    await redis.del("stats:dashboard");
 
-    // ユーザー自身の言語キャッシュもクリア（次回リフレッシュで再取得）
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: { githubName: true },
@@ -80,6 +78,11 @@ export async function PATCH(request: Request) {
     if (user) {
       await prisma.userLanguage.deleteMany({ where: { userId: session.user.id } });
     }
+  }
+
+  // 言語設定またはコミット設定が変わったら、ダッシュボードの全体キャッシュを消す
+  if ("includePrivate" in data || "showLanguages" in data || "showCommits" in data) {
+    await redis.del("stats:dashboard");
   }
 
   return NextResponse.json(updated);
