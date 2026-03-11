@@ -11,6 +11,7 @@ export async function GET(request: Request) {
 
     const users = await prisma.user.findMany({
       // ★ githubName を使う（name は表示名なので GitHub API では使えない）
+      where: { showCommits: true },
       select: { githubName: true },
     });
 

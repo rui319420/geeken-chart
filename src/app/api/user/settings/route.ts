@@ -82,6 +82,11 @@ export async function PATCH(request: Request) {
     }
   }
 
+  // コミット設定が変わったら
+  if ("showCommits" in data) {
+    await redis.del("stats:dashboard");
+  }
+
   return NextResponse.json(updated);
 }
 
