@@ -4,6 +4,11 @@ import redis from "@/lib/redis";
 
 const TTL = 60 * 60 * 6; // 6時間
 
+function calculatePercentage(value: number, total: number): number {
+  if (total === 0) return 0;
+  return Math.round((value / total) * 1000) / 10;
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -16,14 +21,13 @@ export async function GET(request: Request) {
       await redis.get<{ name: string; bytes?: number; percentage: number }[]>(CACHE_KEY);
     if (cached) return NextResponse.json(cached);
 
-    // 全言語を再取得して集計
-    const allLanguages = await prisma.userLanguage.findMany({
-      where: { user: { showLanguages: true } },
-    });
-
     let result;
 
     if (mode === "average") {
+      // 全言語を再取得して集計
+      const allLanguages = await prisma.userLanguage.findMany({
+        where: { user: { showLanguages: true } },
+      });
       // ユーザーごとの割合の平均
       const userLangMap: Record<string, { language: string; bytes: number }[]> = {};
       for (const lang of allLanguages) {
@@ -49,29 +53,33 @@ export async function GET(request: Request) {
       result = Object.entries(scoreMap)
         .map(([name, score]) => ({
           name,
-          percentage: validUserCount > 0 ? Math.round((score / validUserCount) * 1000) / 10 : 0,
+          percentage: calculatePercentage(score, validUserCount),
         }))
         .sort((a, b) => b.percentage - a.percentage)
         .slice(0, 12);
     } else {
       // 全バイト数の合計
-      const byteMap: Record<string, number> = {};
-      for (const lang of allLanguages) {
-        byteMap[lang.language] = (byteMap[lang.language] ?? 0) + lang.bytes;
-      }
+      const groupedLanguages = await prisma.userLanguage.groupBy({
+        by: ["language"],
+        where: { user: { showLanguages: true } },
+        _sum: { bytes: true },
+      });
 
-      const totalBytes = Object.values(byteMap).reduce((s, v) => s + v, 0);
+      const totalBytes = groupedLanguages.reduce((sum, lang) => sum + (lang._sum.bytes ?? 0), 0);
 
-      result = Object.entries(byteMap)
-        .map(([name, bytes]) => ({
-          name,
-          bytes,
-          percentage: totalBytes > 0 ? Math.round((bytes / totalBytes) * 1000) / 10 : 0,
-        }))
+      // グラフ用のフォーマットに変換
+      result = groupedLanguages
+        .map((lang) => {
+          const bytes = lang._sum.bytes ?? 0;
+          return {
+            name: lang.language,
+            bytes: bytes,
+            percentage: calculatePercentage(bytes, totalBytes),
+          };
+        })
         .sort((a, b) => b.bytes - a.bytes)
         .slice(0, 12);
     }
-
     await redis.set(CACHE_KEY, result, { ex: TTL });
     return NextResponse.json(result);
   } catch (error) {
