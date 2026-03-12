@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getUserLanguageStats } from "@/lib/github";
 import redis from "@/lib/redis";
 
 const TTL = 60 * 60 * 6; // 6時間
@@ -16,40 +15,6 @@ export async function GET(request: Request) {
     const cached =
       await redis.get<{ name: string; bytes?: number; percentage: number }[]>(CACHE_KEY);
     if (cached) return NextResponse.json(cached);
-
-    const GITHUB_TOKEN = process.env.GITHUB_ACCESS_TOKEN;
-
-    const users = await prisma.user.findMany({
-      where: { showLanguages: true },
-      include: { languages: true },
-    });
-
-    // 言語データが空のユーザーは GitHub REST API からフェッチして DB に保存
-    if (GITHUB_TOKEN) {
-      await Promise.all(
-        users
-          .filter((u) => u.languages.length === 0)
-          .map(async (user) => {
-            try {
-              const report = await getUserLanguageStats(user.githubName, {
-                token: GITHUB_TOKEN,
-                concurrency: 5,
-              });
-              await Promise.all(
-                report.stats.slice(0, 20).map((stat) =>
-                  prisma.userLanguage.upsert({
-                    where: { userId_language: { userId: user.id, language: stat.language } },
-                    update: { bytes: stat.bytes },
-                    create: { userId: user.id, language: stat.language, bytes: stat.bytes },
-                  }),
-                ),
-              );
-            } catch (e) {
-              console.warn(`Failed to fetch languages for ${user.githubName}:`, e);
-            }
-          }),
-      );
-    }
 
     // 全言語を再取得して集計
     const allLanguages = await prisma.userLanguage.findMany({
