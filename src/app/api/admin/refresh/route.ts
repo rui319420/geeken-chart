@@ -27,6 +27,10 @@ export async function POST() {
 
   const session = await auth();
 
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const users = await prisma.user.findMany({
     select: {
       id: true,
