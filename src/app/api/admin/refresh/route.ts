@@ -146,6 +146,7 @@ export async function POST() {
     redis.del("languages:all:aggregated:total"),
     redis.del("languages:all:aggregated:average"),
     redis.del("languages:trend"),
+    redis.del("discord:heatmap:aggregated"),
     ...users.map((u) => redis.del(`repos:count:${u.githubName}`)),
   ]);
 
