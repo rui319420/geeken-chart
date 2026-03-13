@@ -8,6 +8,7 @@ import ContributionGraph from "@/components/ContributionGraph";
 import LanguageTrendChart from "@/components/LanguageTrendChart";
 import RefreshButton from "@/components/RefreshButton";
 import PrivacySettings from "@/components/PrivacySettings";
+import DiscordHeatmap from "@/components/DiscordHeatmap";
 
 function MemberList() {
   const members = [{ name: "rui319420", avatar: "https://github.com/rui319420.png" }];
@@ -122,6 +123,10 @@ export default async function HomePage() {
 
           <section className="mb-6">
             <LanguageTrendChart />
+          </section>
+
+          <section className="mb-6">
+            <DiscordHeatmap />
           </section>
 
           <section className="mb-6">
