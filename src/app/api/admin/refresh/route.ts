@@ -5,6 +5,7 @@ import { getUserLanguageStats } from "@/lib/github";
 import { getContributionData } from "@/lib/github-graphql";
 import { buildHistoricalSnapshots } from "@/lib/github-history";
 import redis from "@/lib/redis";
+import { fetchUserGitHubStats, calculateGitHubScore } from "@/lib/githubStats";
 
 type RefreshResult = {
   username: string;
@@ -132,6 +133,28 @@ export async function POST() {
       } catch (e) {
         console.error(`Contribution fetch failed for ${githubName}:`, e);
         result.error = appendError(result.error, `contributions: ${errorMsg(e)}`);
+      }
+
+      // ランキング用 GitHub Stats の取得と保存
+      try {
+        const stats = await fetchUserGitHubStats(githubName, token);
+        const score = calculateGitHubScore(stats);
+
+        // データベースの User テーブルを更新する
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            totalStars: stats.totalStars,
+            totalCommits: stats.totalCommits,
+            totalPRs: stats.totalPRs,
+            totalIssues: stats.totalIssues,
+            githubScore: score,
+            statsUpdatedAt: new Date(),
+          },
+        });
+      } catch (e) {
+        console.error(`GitHub Stats fetch failed for ${githubName}:`, e);
+        result.error = appendError(result.error, `stats: ${errorMsg(e)}`);
       }
 
       results.push(result);
