@@ -6,7 +6,7 @@
  *   - discordId ベースで記録し、User との紐付けはオプション
  *   - 収集データ:
  *       1. messageCreate  → メッセージ送信（曜日×時間帯）
- *       2. presenceUpdate → オンライン状況（online/idle/dnd を「アクティブ」とみなす）
+ *       2. ポーリング(30分毎) → その時間帯のオンライン人数を presenceCount に加算
  *
  * 必要な Privileged Intents (Developer Portal で ON にすること):
  *   - Message Content Intent
@@ -22,7 +22,6 @@ import {
   SlashCommandBuilder,
   ChatInputCommandInteraction,
   Message,
-  Presence,
   Events,
   Partials,
 } from "discord.js";
@@ -66,7 +65,7 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent, // Privileged: Message Content Intent
-    GatewayIntentBits.GuildMembers, // Privileged: Server Members Intent
+    GatewayIntentBits.GuildMembers,   // Privileged: Server Members Intent
     GatewayIntentBits.GuildPresences, // Privileged: Presence Intent
   ],
   partials: [Partials.Message, Partials.Channel, Partials.GuildMember],
@@ -132,12 +131,8 @@ function toJstActivity(date: Date): { dayOfWeek: number; hour: number } {
 
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10分
 
-// discordId → userId (紐付け済みユーザーのみ)
 const linkedUserCache = new Map<string, string | null>();
 const linkedUserCacheTime = new Map<string, number>();
-
-// presenceUpdate の直前状態管理
-const lastPresenceStatus = new Map<string, string>(); // discordId → status
 
 async function getLinkedUserId(discordId: string): Promise<string | null> {
   const now = Date.now();
@@ -157,20 +152,20 @@ async function getLinkedUserId(discordId: string): Promise<string | null> {
 }
 
 // ──────────────────────────────────────
-// 活動記録 ユーティリティ
+// 活動記録ユーティリティ
 // ──────────────────────────────────────
 
 async function recordMessage(discordId: string, timestamp: number): Promise<void> {
   const { dayOfWeek, hour } = toJstActivity(new Date(timestamp));
 
-  // 1. 全員分を RawDiscordActivity へ
+  // 全員分を RawDiscordActivity へ
   await prisma.rawDiscordActivity.upsert({
     where: { discordId_dayOfWeek_hour: { discordId, dayOfWeek, hour } },
     update: { messageCount: { increment: 1 } },
     create: { discordId, dayOfWeek, hour, messageCount: 1 },
   });
 
-  // 2. /link 済みは DiscordActivity にも二重書き（ダッシュボード既存 API 用）
+  // /link 済みは DiscordActivity にも二重書き
   const userId = await getLinkedUserId(discordId);
   if (userId) {
     await prisma.discordActivity.upsert({
@@ -181,14 +176,60 @@ async function recordMessage(discordId: string, timestamp: number): Promise<void
   }
 }
 
-async function recordPresence(discordId: string): Promise<void> {
-  const { dayOfWeek, hour } = toJstActivity(new Date());
+// ──────────────────────────────────────
+// オンライン人数ポーリング（30分ごと）
+// ──────────────────────────────────────
 
-  await prisma.rawDiscordActivity.upsert({
-    where: { discordId_dayOfWeek_hour: { discordId, dayOfWeek, hour } },
-    update: { presenceCount: { increment: 1 } },
-    create: { discordId, dayOfWeek, hour, presenceCount: 1 },
-  });
+const POLL_INTERVAL_MS = 30 * 60 * 1000; // 30分
+const DAY_LABELS = ["月", "火", "水", "木", "金", "土", "日"];
+
+async function pollOnlineMembers(): Promise<void> {
+  try {
+    const guild = await client.guilds.fetch(GUILD_ID);
+
+    // presenceキャッシュを最新に更新
+    await guild.members.fetch();
+
+    const onlineMembers = guild.members.cache.filter(
+      (m) =>
+        !m.user.bot &&
+        (m.presence?.status === "online" ||
+          m.presence?.status === "idle" ||
+          m.presence?.status === "dnd"),
+    );
+
+    const onlineCount = onlineMembers.size;
+    if (onlineCount === 0) {
+      console.log("[Bot] ポーリング: オンラインメンバーなし");
+      return;
+    }
+
+    const { dayOfWeek, hour } = toJstActivity(new Date());
+
+    // オンラインだった各メンバーの presenceCount を +1
+    await Promise.all(
+      onlineMembers.map((member) =>
+        prisma.rawDiscordActivity.upsert({
+          where: {
+            discordId_dayOfWeek_hour: {
+              discordId: member.id,
+              dayOfWeek,
+              hour,
+            },
+          },
+          update: { presenceCount: { increment: 1 } },
+          create: { discordId: member.id, dayOfWeek, hour, presenceCount: 1 },
+        }),
+      ),
+    );
+
+    console.log(
+      `[Bot] ポーリング完了: ${onlineCount}人オンライン` +
+        ` (${DAY_LABELS[dayOfWeek]} ${hour}時台)`,
+    );
+  } catch (err) {
+    console.error("[Bot] ポーリング失敗:", err);
+  }
 }
 
 // ──────────────────────────────────────
@@ -200,17 +241,18 @@ client.once(Events.ClientReady, async (readyClient) => {
   console.log(`[Bot] ログイン完了: ${readyClient.user.tag}`);
   await registerCommands();
 
-  // 起動時に全メンバーのプレゼンスをキャッシュ
+  // 起動時に全メンバーをキャッシュ（presence取得のため）
   try {
     const guild = await readyClient.guilds.fetch(GUILD_ID);
-    const members = await guild.members.fetch();
-    members.forEach((member) => {
-      lastPresenceStatus.set(member.id, member.presence?.status ?? "offline");
-    });
-    console.log(`[Bot] ${members.size} 人のプレゼンスをキャッシュ完了`);
+    await guild.members.fetch();
+    console.log(`[Bot] メンバーキャッシュ完了 (${guild.members.cache.size}人)`);
   } catch (err) {
-    console.warn("[Bot] メンバープレゼンスの初期取得に失敗:", err);
+    console.warn("[Bot] メンバーキャッシュ失敗:", err);
   }
+
+  // 起動直後に1回ポーリング → 以降30分ごと
+  await pollOnlineMembers();
+  setInterval(pollOnlineMembers, POLL_INTERVAL_MS);
 });
 
 // ──────────────────────────────────────
@@ -225,32 +267,6 @@ client.on(Events.MessageCreate, async (message: Message) => {
     await recordMessage(message.author.id, message.createdTimestamp);
   } catch (err) {
     console.error("[Bot] messageCreate 記録失敗:", err);
-  }
-});
-
-// ──────────────────────────────────────
-// イベント: presenceUpdate
-// ──────────────────────────────────────
-
-client.on(Events.PresenceUpdate, async (_old: Presence | null, newPresence: Presence) => {
-  if (newPresence.guild?.id !== GUILD_ID) return;
-
-  const discordId = newPresence.userId;
-  const newStatus = newPresence.status ?? "offline";
-  const prevStatus = lastPresenceStatus.get(discordId) ?? "offline";
-
-  lastPresenceStatus.set(discordId, newStatus);
-
-  // offline → online/idle/dnd への遷移（オンラインになった瞬間）を記録
-  const wasOffline = prevStatus === "offline";
-  const isOnline = newStatus !== "offline";
-
-  if (wasOffline && isOnline) {
-    try {
-      await recordPresence(discordId);
-    } catch (err) {
-      console.error("[Bot] presenceUpdate 記録失敗:", err);
-    }
   }
 });
 
@@ -317,7 +333,6 @@ async function handleLink(interaction: ChatInputCommandInteraction) {
     return;
   }
 
-  // 紐付け前に蓄積した rawDiscordActivity を DiscordActivity に移行
   const raw = await prisma.rawDiscordActivity.findMany({ where: { discordId } });
   if (raw.length > 0) {
     await Promise.all(
@@ -339,8 +354,6 @@ async function handleLink(interaction: ChatInputCommandInteraction) {
   }
 
   await prisma.user.update({ where: { id: user.id }, data: { discordId } });
-
-  // キャッシュを即時更新
   linkedUserCache.set(discordId, user.id);
   linkedUserCacheTime.set(discordId, Date.now());
 
