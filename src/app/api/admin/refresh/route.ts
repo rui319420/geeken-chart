@@ -8,6 +8,8 @@ import redis from "@/lib/redis";
 import { fetchUserGitHubStats, calculateGitHubScore } from "@/lib/githubStats";
 import pLimit from "p-limit";
 
+export const maxDuration = 60;
+
 type RefreshResult = {
   username: string;
   languages: number;

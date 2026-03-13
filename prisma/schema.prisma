@@ -50,8 +50,7 @@ model User {
   githubScore   Int       @default(0) // ランキングのソート用総合スコア
   statsUpdatedAt DateTime @default(now()) // いつ計算したデータか
 
-  @@index([githubScore(sort: Desc)])
-  @@index([joinRanking])
+  @@index([joinRanking, githubScore(sort: Desc)])
 }
 
 // ──────────────────────────────────────
