@@ -148,8 +148,8 @@ export default function DiscordHeatmap() {
       </div>
 
       {/* ヒートマップ本体 */}
-      <div style={{ overflowX: "auto" }}>
-        <div style={{ minWidth: 500 }}>
+      <div>
+        <div>
           {/* X軸 時間ラベル */}
           <div style={{ display: "grid", gridTemplateColumns: "22px 1fr", marginBottom: 3 }}>
             <div />
@@ -210,7 +210,7 @@ export default function DiscordHeatmap() {
                       onMouseLeave={() => setHovered(null)}
                       style={{
                         flex: 1,
-                        aspectRatio: "1 / 1.1",
+                        aspectRatio: "1 / 1",
                         borderRadius: 3,
                         background: loading ? "rgba(22,27,34,0.5)" : cellStyle.background,
                         boxShadow: isHovered
@@ -259,7 +259,7 @@ export default function DiscordHeatmap() {
                 fontWeight: 700,
               }}
             >
-              {display.matrix[hovered.day][hovered.hour].toLocaleString()} 件
+              {display.matrix[hovered.day][hovered.hour].toLocaleString()} 人
             </span>
           </div>
         ) : isEmpty ? (
