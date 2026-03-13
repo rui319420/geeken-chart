@@ -111,7 +111,11 @@ export default async function RankingBoard() {
                       className="h-8 w-8 rounded-full border border-white/10"
                     />
                   ) : (
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-600 text-xs text-white">
+                    <div
+                      className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-600 text-xs text-white"
+                      role="img"
+                      aria-label="匿名ユーザー"
+                    >
                       👻
                     </div>
                   )}

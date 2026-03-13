@@ -74,13 +74,13 @@ export async function POST() {
           });
 
           await prisma.userLanguage.deleteMany({ where: { userId: user.id } });
-          await Promise.all(
-            report.stats.slice(0, 20).map((stat) =>
-              prisma.userLanguage.create({
-                data: { userId: user.id, language: stat.language, bytes: stat.bytes },
-              }),
-            ),
-          );
+          await prisma.userLanguage.createMany({
+            data: report.stats.slice(0, 20).map((stat) => ({
+              userId: user.id,
+              language: stat.language,
+              bytes: stat.bytes,
+            })),
+          });
 
           result.languages = report.stats.length;
         } catch (e) {
