@@ -49,6 +49,9 @@ model User {
   totalIssues   Int       @default(0)
   githubScore   Int       @default(0) // ランキングのソート用総合スコア
   statsUpdatedAt DateTime @default(now()) // いつ計算したデータか
+
+  @@index([githubScore(sort: Desc)])
+  @@index([joinRanking])
 }
 
 // ──────────────────────────────────────
