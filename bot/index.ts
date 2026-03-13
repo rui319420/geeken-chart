@@ -65,7 +65,7 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent, // Privileged: Message Content Intent
-    GatewayIntentBits.GuildMembers,   // Privileged: Server Members Intent
+    GatewayIntentBits.GuildMembers, // Privileged: Server Members Intent
     GatewayIntentBits.GuildPresences, // Privileged: Presence Intent
   ],
   partials: [Partials.Message, Partials.Channel, Partials.GuildMember],
