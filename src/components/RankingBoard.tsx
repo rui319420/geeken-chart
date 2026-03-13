@@ -26,7 +26,7 @@ export default async function RankingBoard() {
     },
   });
 
-  const top5Users = top5UsersRaw.map((user, index) => {
+  const top5Users = top5UsersRaw.map((user) => {
     // 自分のスコアと同じスコアを持つ一番最初の人のインデックスを探し、それに+1する。
     // 例: スコアが [100, 100, 90] の場合
     // 1人目(100): 100が最初に出現するのはindex 0 -> 0 + 1 = 1位
