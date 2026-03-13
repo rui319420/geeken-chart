@@ -7,15 +7,11 @@ export default async function RankingBoard() {
   const session = await auth();
   const currentUserId = session?.user?.id;
 
-  // スコアが高い順に「全員分」を取得する
-  const allUsers = await prisma.user.findMany({
-    where: {
-      joinRanking: true, // ランキング参加フラグがONの人だけ
-      githubScore: { gt: 0 }, // スコアが0より大きい人のみ
-    },
-    orderBy: {
-      githubScore: "desc", // スコアの高い順
-    },
+  // Top 5 を直接DBから取得する
+  const top5UsersRaw = await prisma.user.findMany({
+    where: { joinRanking: true, githubScore: { gt: 0 } },
+    orderBy: { githubScore: "desc" },
+    take: 5,
     select: {
       id: true,
       githubName: true,
@@ -30,18 +26,47 @@ export default async function RankingBoard() {
     },
   });
 
-  // Top 5 を切り出す
-  const top5Users = allUsers.slice(0, 5);
+  const top5Users = top5UsersRaw.map((user, index) => {
+    // 自分のスコアと同じスコアを持つ一番最初の人のインデックスを探し、それに+1する。
+    // 例: スコアが [100, 100, 90] の場合
+    // 1人目(100): 100が最初に出現するのはindex 0 -> 0 + 1 = 1位
+    // 2人目(100): 100が最初に出現するのはindex 0 -> 0 + 1 = 1位
+    // 3人目( 90):  90が最初に出現するのはindex 2 -> 2 + 1 = 3位
+    const displayRank = top5UsersRaw.findIndex((u) => u.githubScore === user.githubScore) + 1;
 
-  // 自分の順位を探す
+    return { ...user, displayRank };
+  });
+
+  // 自分の順位とデータを個別に取得する
   let myRank = -1;
   let myData = null;
 
   if (currentUserId) {
-    const myIndex = allUsers.findIndex((user) => user.id === currentUserId);
-    if (myIndex !== -1) {
-      myRank = myIndex + 1;
-      myData = allUsers[myIndex];
+    // まず自分のデータを取得
+    myData = await prisma.user.findUnique({
+      where: { id: currentUserId },
+      select: {
+        id: true,
+        githubName: true,
+        nickname: true,
+        avatarUrl: true,
+        githubScore: true,
+        isAnonymous: true,
+      },
+    });
+
+    // 自分がランキングに参加しており、スコアが0より大きい場合のみ順位を計算
+    if (myData && myData.githubScore && myData.githubScore > 0) {
+      // 自分よりスコアが高い人の数をカウントする
+      const higherScoreCount = await prisma.user.count({
+        where: {
+          joinRanking: true,
+          githubScore: { gt: myData.githubScore },
+        },
+      });
+      myRank = higherScoreCount + 1;
+    } else {
+      myData = null; // ランキング不参加の場合は表示しない
     }
   }
 
@@ -53,15 +78,13 @@ export default async function RankingBoard() {
 
       {/* Top 5 リスト */}
       <ul className="flex flex-col gap-3">
-        {top5Users.map((user, index) => {
-          // 順位によって王冠やメダルの色を変える
-          const isTop3 = index < 3;
+        {top5Users.map((user) => {
           const rankColor =
-            index === 0
+            user.displayRank === 1
               ? "text-yellow-400"
-              : index === 1
+              : user.displayRank === 2
                 ? "text-gray-300"
-                : index === 2
+                : user.displayRank === 3
                   ? "text-orange-400"
                   : "text-[#8b949e]";
 
@@ -73,9 +96,9 @@ export default async function RankingBoard() {
               <div className="flex items-center gap-4">
                 {/* 順位バッジ */}
                 <div
-                  className={`flex h-8 w-8 items-center justify-center rounded-full font-bold ${rankColor} ${isTop3 ? "bg-white/5" : ""}`}
+                  className={`flex h-8 w-8 items-center justify-center rounded-full font-bold ${rankColor} ${user.displayRank <= 3 ? "bg-white/5" : ""}`}
                 >
-                  {index + 1}
+                  {user.displayRank}
                 </div>
 
                 {/* アイコンと名前 */}
