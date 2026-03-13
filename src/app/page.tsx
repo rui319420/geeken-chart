@@ -9,6 +9,7 @@ import LanguageTrendChart from "@/components/LanguageTrendChart";
 import RefreshButton from "@/components/RefreshButton";
 import PrivacySettings from "@/components/PrivacySettings";
 import DiscordHeatmap from "@/components/DiscordHeatmap";
+import RankingBoard from "@/components/RankingBoard";
 
 function MemberList() {
   const members = [{ name: "rui319420", avatar: "https://github.com/rui319420.png" }];
@@ -22,7 +23,7 @@ function MemberList() {
             href={`https://github.com/${m.name}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="group flex items-center gap-2 rounded-lg border border-white/5 bg-white/[0.03] px-3 py-2 transition-all duration-200 hover:border-white/10 hover:bg-white/[0.06]"
+            className="group flex items-center gap-2 rounded-lg border border-white/5 bg-white/3 px-3 py-2 transition-all duration-200 hover:border-white/10 hover:bg-white/6"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={m.avatar} alt={m.name} width={24} height={24} className="rounded-full" />
@@ -127,6 +128,10 @@ export default async function HomePage() {
 
           <section className="mb-6">
             <DiscordHeatmap />
+          </section>
+
+          <section className="mb-6">
+            <RankingBoard />
           </section>
 
           <section className="mb-6">
