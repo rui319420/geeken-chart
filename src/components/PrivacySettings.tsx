@@ -57,7 +57,7 @@ function Toggle({ id, label, description, checked, onChange, disabled, highlight
 }
 
 export default function PrivacySettings() {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [saving, setSaving] = useState<keyof Settings | null>(null);
   const [message, setMessage] = useState("");

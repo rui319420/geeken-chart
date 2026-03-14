@@ -198,7 +198,11 @@ export default function LanguageTrendChart() {
   const toggleLine = (lang: string) => {
     setHiddenLines((prev) => {
       const next = new Set(prev);
-      next.has(lang) ? next.delete(lang) : next.add(lang);
+      if (next.has(lang)) {
+        next.delete(lang);
+      } else {
+        next.add(lang);
+      }
       return next;
     });
   };
