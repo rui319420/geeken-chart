@@ -4,3 +4,4 @@ prisma/migrations/
 public/
 src/generated/
 .github/
+bot/

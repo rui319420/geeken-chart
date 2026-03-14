@@ -23,3 +23,6 @@ Thumbs.db
 prisma/migrations/dev.db
 
 /app/generated/prisma
+
+# dist
+/bot/dist
