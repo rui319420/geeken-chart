@@ -5,6 +5,10 @@ import { getUserLanguageStats } from "@/lib/github";
 import { getContributionData } from "@/lib/github-graphql";
 import { buildHistoricalSnapshots } from "@/lib/github-history";
 import redis from "@/lib/redis";
+import { fetchUserGitHubStats, calculateGitHubScore } from "@/lib/githubStats";
+import pLimit from "p-limit";
+
+export const maxDuration = 60;
 
 type RefreshResult = {
   username: string;
@@ -22,6 +26,10 @@ export async function POST() {
   }
 
   const session = await auth();
+
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const users = await prisma.user.findMany({
     select: {
@@ -41,101 +49,127 @@ export async function POST() {
 
   const results: RefreshResult[] = [];
 
+  const limit = pLimit(3);
+
   await Promise.all(
-    users.map(async (user) => {
-      const githubName = user.githubName;
-      const oauthToken = user.accounts[0]?.access_token ?? null;
-      const usePrivate = user.includePrivate && !!oauthToken;
-      const token = usePrivate ? oauthToken! : FALLBACK_TOKEN;
+    users.map((user) =>
+      limit(async () => {
+        const githubName = user.githubName;
+        const oauthToken = user.accounts[0]?.access_token ?? null;
+        const usePrivate = user.includePrivate && !!oauthToken;
+        const token = usePrivate ? oauthToken! : FALLBACK_TOKEN;
 
-      const result: RefreshResult = {
-        username: githubName,
-        languages: 0,
-        commits: 0,
-        snapshotMonths: 0,
-        usedPrivateToken: usePrivate,
-      };
+        const result: RefreshResult = {
+          username: githubName,
+          languages: 0,
+          commits: 0,
+          snapshotMonths: 0,
+          usedPrivateToken: usePrivate,
+        };
 
-      // ──────────────────────────────────────────────────────────────────
-      // 1. 現在の言語データを UserLanguage テーブルに保存（円グラフ用）
-      // ──────────────────────────────────────────────────────────────────
-      try {
-        const report = await getUserLanguageStats(githubName, {
-          token,
-          includePrivate: usePrivate,
-          concurrency: 5,
-        });
+        // ──────────────────────────────────────────────────────────────────
+        // 1. 現在の言語データを UserLanguage テーブルに保存（円グラフ用）
+        // ──────────────────────────────────────────────────────────────────
+        try {
+          const report = await getUserLanguageStats(githubName, {
+            token,
+            includePrivate: usePrivate,
+            concurrency: 5,
+          });
 
-        await prisma.userLanguage.deleteMany({ where: { userId: user.id } });
-        await Promise.all(
-          report.stats.slice(0, 20).map((stat) =>
-            prisma.userLanguage.create({
-              data: { userId: user.id, language: stat.language, bytes: stat.bytes },
-            }),
-          ),
-        );
+          await prisma.userLanguage.deleteMany({ where: { userId: user.id } });
+          await prisma.userLanguage.createMany({
+            data: report.stats.slice(0, 20).map((stat) => ({
+              userId: user.id,
+              language: stat.language,
+              bytes: stat.bytes,
+            })),
+          });
 
-        result.languages = report.stats.length;
-      } catch (e) {
-        console.error(`Language fetch failed for ${githubName}:`, e);
-        result.error = appendError(result.error, `languages: ${errorMsg(e)}`);
-      }
+          result.languages = report.stats.length;
+        } catch (e) {
+          console.error(`Language fetch failed for ${githubName}:`, e);
+          result.error = appendError(result.error, `languages: ${errorMsg(e)}`);
+        }
 
-      // ──────────────────────────────────────────────────────────────────
-      // 2. 過去12ヶ月分の言語ヒストリーを LanguageSnapshot に保存（折れ線グラフ用）
-      //
-      //    github-history.ts が各リポジトリの created_at を使って
-      //    「その月末時点で存在していたリポジトリ」を集計する。
-      //    → 後から参加したユーザーでも即座に過去データが生成される。
-      // ──────────────────────────────────────────────────────────────────
-      try {
-        const historicalSnapshots = await buildHistoricalSnapshots(githubName, token, {
-          monthsBack: 12,
-          includeForks: false,
-          includePrivate: usePrivate,
-          concurrency: 5,
-        });
+        // ──────────────────────────────────────────────────────────────────
+        // 2. 過去12ヶ月分の言語ヒストリーを LanguageSnapshot に保存（折れ線グラフ用）
+        //
+        //    github-history.ts が各リポジトリの created_at を使って
+        //    「その月末時点で存在していたリポジトリ」を集計する。
+        //    → 後から参加したユーザーでも即座に過去データが生成される。
+        // ──────────────────────────────────────────────────────────────────
+        try {
+          const historicalSnapshots = await buildHistoricalSnapshots(githubName, token, {
+            monthsBack: 12,
+            includeForks: false,
+            includePrivate: usePrivate,
+            concurrency: 5,
+          });
 
-        // upsert: 同じ (userId, language, month) は上書き
-        await Promise.all(
-          historicalSnapshots.flatMap(({ month, languages }) =>
-            Object.entries(languages).map(([language, bytes]) =>
-              prisma.languageSnapshot.upsert({
-                where: {
-                  userId_language_month: { userId: user.id, language, month },
-                },
-                update: { bytes },
-                create: { userId: user.id, language, bytes, month },
-              }),
+          // upsert: 同じ (userId, language, month) は上書き
+          await Promise.all(
+            historicalSnapshots.flatMap(({ month, languages }) =>
+              Object.entries(languages).map(([language, bytes]) =>
+                prisma.languageSnapshot.upsert({
+                  where: {
+                    userId_language_month: { userId: user.id, language, month },
+                  },
+                  update: { bytes },
+                  create: { userId: user.id, language, bytes, month },
+                }),
+              ),
             ),
-          ),
-        );
+          );
 
-        result.snapshotMonths = historicalSnapshots.length;
-      } catch (e) {
-        console.error(`History build failed for ${githubName}:`, e);
-        result.error = appendError(result.error, `history: ${errorMsg(e)}`);
-      }
+          result.snapshotMonths = historicalSnapshots.length;
+        } catch (e) {
+          console.error(`History build failed for ${githubName}:`, e);
+          result.error = appendError(result.error, `history: ${errorMsg(e)}`);
+        }
 
-      // ──────────────────────────────────────────────────────────────────
-      // 3. コントリビューションを Redis に保存（草グラフ用）
-      // ──────────────────────────────────────────────────────────────────
-      try {
-        const contribToken = oauthToken ?? FALLBACK_TOKEN;
-        const data = await getContributionData(githubName, contribToken);
+        // ──────────────────────────────────────────────────────────────────
+        // 3. コントリビューションを Redis に保存（草グラフ用）
+        // ──────────────────────────────────────────────────────────────────
+        try {
+          const contribToken = oauthToken ?? FALLBACK_TOKEN;
+          const data = await getContributionData(githubName, contribToken);
 
-        await redis.set(`contributions:days:${githubName}:latest`, JSON.stringify(data.days), {
-          ex: 86400,
-        });
+          await redis.set(`contributions:days:${githubName}:latest`, JSON.stringify(data.days), {
+            ex: 86400,
+          });
 
-        result.commits = data.totalContributions;
-      } catch (e) {
-        console.error(`Contribution fetch failed for ${githubName}:`, e);
-        result.error = appendError(result.error, `contributions: ${errorMsg(e)}`);
-      }
+          result.commits = data.totalContributions;
+        } catch (e) {
+          console.error(`Contribution fetch failed for ${githubName}:`, e);
+          result.error = appendError(result.error, `contributions: ${errorMsg(e)}`);
+        }
 
-      results.push(result);
-    }),
+        // ランキング用 GitHub Stats の取得と保存
+        try {
+          const stats = await fetchUserGitHubStats(githubName, token);
+          const score = calculateGitHubScore(stats);
+
+          // データベースの User テーブルを更新する
+          await prisma.user.update({
+            where: { id: user.id },
+            data: {
+              totalStars: stats.totalStars,
+              totalCommits: stats.totalCommits,
+              totalPRs: stats.totalPRs,
+              totalIssues: stats.totalIssues,
+              githubScore: score,
+              statsUpdatedAt: new Date(),
+            },
+          });
+        } catch (e) {
+          console.error(`GitHub Stats fetch failed for ${githubName}:`, e);
+          result.error = appendError(result.error, `stats: ${errorMsg(e)}`);
+        }
+
+        results.push(result);
+      }),
+    ),
   );
 
   // ──────────────────────────────────────────────────────────────────
@@ -143,7 +177,8 @@ export async function POST() {
   // ──────────────────────────────────────────────────────────────────
   await Promise.all([
     redis.del("stats:dashboard"),
-    redis.del("languages:all:aggregated"),
+    redis.del("languages:all:aggregated:total"),
+    redis.del("languages:all:aggregated:average"),
     redis.del("languages:trend"),
     redis.del("discord:heatmap:aggregated"),
     ...users.map((u) => redis.del(`repos:count:${u.githubName}`)),

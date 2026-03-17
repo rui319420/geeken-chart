@@ -9,6 +9,7 @@ interface Settings {
   showLanguages: boolean;
   joinRanking: boolean;
   isAnonymous: boolean;
+  nickname?: string;
 }
 
 interface ToggleProps {
@@ -56,16 +57,20 @@ function Toggle({ id, label, description, checked, onChange, disabled, highlight
 }
 
 export default function PrivacySettings() {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [saving, setSaving] = useState<keyof Settings | null>(null);
   const [message, setMessage] = useState("");
+  const [nickname, setNickname] = useState("");
 
   useEffect(() => {
     if (status !== "authenticated") return;
     fetch("/api/user/settings")
       .then((r) => r.json())
-      .then((data: Settings) => setSettings(data))
+      .then((data: Settings) => {
+        setSettings(data);
+        if (data.nickname) setNickname(data.nickname);
+      })
       .catch((e) => console.error("Settings fetch failed:", e));
   }, [status]);
 
@@ -87,6 +92,26 @@ export default function PrivacySettings() {
       setTimeout(() => setMessage(""), 2000);
     } catch {
       setSettings({ ...settings, [key]: prev }); // ロールバック
+      setMessage("保存に失敗しました");
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const updateNickname = async () => {
+    setSaving("nickname");
+    setMessage("");
+
+    try {
+      const res = await fetch("/api/user/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nickname: nickname.trim() }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      setMessage("ニックネームを保存しました");
+      setTimeout(() => setMessage(""), 2000);
+    } catch {
       setMessage("保存に失敗しました");
     } finally {
       setSaving(null);
@@ -136,6 +161,30 @@ export default function PrivacySettings() {
         </div>
       ) : (
         <div className="divide-y divide-white/[0.04]">
+          {/* ニックネーム */}
+          <div className="flex items-center justify-between gap-4 py-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-[#e6edf3]">ニックネーム</p>
+              <p className="mt-0.5 text-xs text-[#636e7b]">ランキング等で表示される名前です。</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                placeholder="新しい名前"
+                maxLength={20}
+                className="rounded-md border border-white/10 bg-[#0d1117] px-3 py-1.5 text-sm text-[#e6edf3] focus:border-[#388bfd] focus:ring-1 focus:ring-[#388bfd] focus:outline-none"
+              />
+              <button
+                onClick={updateNickname}
+                disabled={saving === "nickname" || nickname.trim() === ""}
+                className="rounded-md bg-[#238636] px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#2ea043] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                保存
+              </button>
+            </div>
+          </div>
           {/* プライベートリポジトリ */}
           <Toggle
             id="includePrivate"

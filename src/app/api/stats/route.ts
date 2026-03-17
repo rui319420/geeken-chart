@@ -39,12 +39,13 @@ export async function GET() {
       prisma.user.count(),
       prisma.userLanguage.findMany({ distinct: ["language"], select: { language: true } }),
       // ★ githubName を使う（name は表示名なので GitHub API では使えない）
-      prisma.user.findMany({ select: { githubName: true } }),
+      prisma.user.findMany({ select: { githubName: true, showCommits: true } }),
     ]);
 
     // コミット数：Redis キャッシュから集計（キーは githubName ベース）
     let totalCommits = 0;
     for (const user of users) {
+      if (!user.showCommits) continue;
       try {
         const key = `contributions:days:${user.githubName}:latest`;
         const days = await redis.get<Array<{ contributionCount: number }>>(key);

@@ -9,7 +9,17 @@ interface SettingsBody {
   showLanguages?: boolean;
   joinRanking?: boolean;
   isAnonymous?: boolean;
+  nickname?: string;
 }
+
+const userSettingsSelect = {
+  includePrivate: true,
+  showCommits: true,
+  showLanguages: true,
+  joinRanking: true,
+  isAnonymous: true,
+  nickname: true,
+};
 
 export async function PATCH(request: Request) {
   const session = await auth();
@@ -19,8 +29,21 @@ export async function PATCH(request: Request) {
 
   const body: SettingsBody = await request.json();
 
-  // 許可するフィールドのみ更新
-  const allowedFields: (keyof SettingsBody)[] = [
+  const data: Partial<SettingsBody> = {};
+
+  if (typeof body.nickname === "string") {
+    const trimmedNickname = body.nickname.trim();
+    if (trimmedNickname.length > 20) {
+      return NextResponse.json(
+        { error: "ニックネームは20文字以内で入力してください" },
+        { status: 400 },
+      );
+    }
+    data.nickname = trimmedNickname;
+  }
+
+  // booleanのフィールドだけを配列にまとめる
+  const booleanFields: (keyof Omit<SettingsBody, "nickname">)[] = [
     "includePrivate",
     "showCommits",
     "showLanguages",
@@ -28,13 +51,11 @@ export async function PATCH(request: Request) {
     "isAnonymous",
   ];
 
-  const data: Partial<SettingsBody> = {};
-  for (const key of allowedFields) {
+  for (const key of booleanFields) {
     if (typeof body[key] === "boolean") {
       data[key] = body[key];
     }
   }
-
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "No valid fields provided" }, { status: 400 });
   }
@@ -42,21 +63,14 @@ export async function PATCH(request: Request) {
   const updated = await prisma.user.update({
     where: { id: session.user.id },
     data,
-    select: {
-      includePrivate: true,
-      showCommits: true,
-      showLanguages: true,
-      joinRanking: true,
-      isAnonymous: true,
-    },
+    select: userSettingsSelect,
   });
 
-  // includePrivate が変わったら言語キャッシュをクリア
+  // 言語関連の設定が変わったら、言語グラフのキャッシュと個人の言語データを消す
   if ("includePrivate" in data || "showLanguages" in data) {
-    await redis.del("languages:all:aggregated");
-    await redis.del("stats:dashboard");
+    await redis.del("languages:all:aggregated:total");
+    await redis.del("languages:all:aggregated:average");
 
-    // ユーザー自身の言語キャッシュもクリア（次回リフレッシュで再取得）
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: { githubName: true },
@@ -64,6 +78,11 @@ export async function PATCH(request: Request) {
     if (user) {
       await prisma.userLanguage.deleteMany({ where: { userId: session.user.id } });
     }
+  }
+
+  // 言語設定またはコミット設定が変わったら、ダッシュボードの全体キャッシュを消す
+  if ("includePrivate" in data || "showLanguages" in data || "showCommits" in data) {
+    await redis.del("stats:dashboard");
   }
 
   return NextResponse.json(updated);
@@ -77,13 +96,7 @@ export async function GET() {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: {
-      includePrivate: true,
-      showCommits: true,
-      showLanguages: true,
-      joinRanking: true,
-      isAnonymous: true,
-    },
+    select: userSettingsSelect,
   });
 
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });

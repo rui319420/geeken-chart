@@ -56,6 +56,10 @@ const renderActiveShape = ({
   const ey = my;
   const textAnchor = cos >= 0 ? "start" : "end";
 
+  // KBの表示（バイト数が0の場合は非表示）
+  const payloadData = payload as { bytes?: number };
+  const bytesText = payloadData.bytes ? `${(payloadData.bytes / 1024).toFixed(0)} KB` : "";
+
   return (
     <g>
       <text x={cx} y={cy} dy={8} textAnchor="middle" fill={fill} fontSize={22} fontWeight="bold">
@@ -90,27 +94,29 @@ const renderActiveShape = ({
       >
         {`${((percent ?? 0) * 100).toFixed(1)}%`}
       </text>
-      <text
-        x={ex + (cos >= 0 ? 1 : -1) * 12}
-        y={ey}
-        dy={18}
-        textAnchor={textAnchor}
-        fill="#949BA4"
-        fontSize={12}
-      >
-        {(payload as { name: string; bytes: number }).bytes
-          ? `${((payload as { bytes: number }).bytes / 1024).toFixed(0)} KB`
-          : ""}
-      </text>
+      {bytesText && (
+        <text
+          x={ex + (cos >= 0 ? 1 : -1) * 12}
+          y={ey}
+          dy={18}
+          textAnchor={textAnchor}
+          fill="#949BA4"
+          fontSize={12}
+        >
+          {bytesText}
+        </text>
+      )}
     </g>
   );
 };
 
 interface LangData {
   name: string;
-  bytes: number;
+  bytes?: number;
   percentage: number;
 }
+
+type AggregationMode = "total" | "average";
 
 const INTERVAL_MS = 2000;
 const INITIAL_DELAY_MS = 1000;
@@ -121,6 +127,7 @@ export default function LanguagePieChart() {
   const [loading, setLoading] = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
   const [includePrivate, setIncludePrivate] = useState<boolean | null>(null);
+  const [mode, setMode] = useState<AggregationMode>("total");
 
   const dataLengthRef = useRef(0);
   const activeIndexRef = useRef(0);
@@ -163,7 +170,7 @@ export default function LanguagePieChart() {
     [activeIndex],
   );
 
-  // 1. 設定取得
+  // 設定取得
   useEffect(() => {
     fetch("/api/user/settings", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
@@ -172,14 +179,16 @@ export default function LanguagePieChart() {
       );
   }, []);
 
-  // データ取得
+  // データ取得（modeの変更も監視する）
   useEffect(() => {
     if (includePrivate === null) return; // 設定取得待ち
 
     const fetchData = async () => {
+      setLoading(true); // モード切り替え時にローディングを出す
       try {
         const params = new URLSearchParams();
         if (includePrivate) params.set("includePrivate", "true");
+        params.set("mode", mode);
         params.set("t", Date.now().toString());
 
         const res = await fetch(`/api/languages/all?${params.toString()}`, {
@@ -202,11 +211,11 @@ export default function LanguagePieChart() {
 
     return () => stopLoop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [includePrivate, startLoop]);
+  }, [includePrivate, mode, startLoop]);
 
   return (
-    <div className="flex h-[450px] w-full flex-col rounded-xl border border-[#2ea043]/40 bg-gradient-to-br from-[#0d1117] to-[#181a26] p-4 shadow-[0_0_20px_rgba(88,101,242,0.15)] md:h-[500px] md:p-6">
-      <div className="mb-4 flex items-center justify-between">
+    <div className="flex h-112.5 w-full flex-col rounded-xl border border-[#2ea043]/40 bg-linear-to-br from-[#0d1117] to-[#181a26] p-4 shadow-[0_0_20px_rgba(88,101,242,0.15)] md:h-125 md:p-6">
+      <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
           <h2 className="text-xl font-bold tracking-wider text-[#F2F3F5]">言語割合（全体）</h2>
           <p className="mt-0.5 text-xs text-[#636e7b]">
@@ -215,22 +224,30 @@ export default function LanguagePieChart() {
               : "公開リポジトリのコード使用量を集計（GitHub Linguist）"}
           </p>
         </div>
-        {includePrivate && (
-          <span className="flex items-center gap-1 rounded-full border border-[#388bfd]/30 bg-[#388bfd]/10 px-2.5 py-1 text-[11px] font-medium text-[#388bfd]">
-            <svg
-              width="10"
-              height="10"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-            >
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-            </svg>
-            プライベート含む
-          </span>
-        )}
+
+        {/* モード切替トグル */}
+        <div className="flex items-center gap-2 rounded-lg bg-black/40 p-1">
+          <button
+            onClick={() => setMode("total")}
+            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-all duration-200 ${
+              mode === "total"
+                ? "bg-[#388bfd]/20 text-[#388bfd] shadow-[0_0_10px_rgba(56,139,253,0.3)]"
+                : "text-[#949BA4] hover:text-[#F2F3F5]"
+            }`}
+          >
+            全体合計
+          </button>
+          <button
+            onClick={() => setMode("average")}
+            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-all duration-200 ${
+              mode === "average"
+                ? "bg-[#388bfd]/20 text-[#388bfd] shadow-[0_0_10px_rgba(56,139,253,0.3)]"
+                : "text-[#949BA4] hover:text-[#F2F3F5]"
+            }`}
+          >
+            ユーザー平均
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -267,7 +284,7 @@ export default function LanguagePieChart() {
               cy="50%"
               innerRadius="38%"
               outerRadius="58%"
-              dataKey="bytes"
+              dataKey="percentage"
               stroke="none"
               shape={renderShape}
               onMouseEnter={(_, index) => {

@@ -160,6 +160,91 @@ export default function DiscordHeatmap() {
               </span>
             ))}
           </div>
+        )}
+      </div>
+
+      {/* ヒートマップ本体 */}
+      <div>
+        <div>
+          {/* X軸 時間ラベル */}
+          <div style={{ display: "grid", gridTemplateColumns: "22px 1fr", marginBottom: 3 }}>
+            <div />
+            <div style={{ position: "relative", height: 14 }}>
+              {HOUR_TICKS.map((h) => (
+                <span
+                  key={h}
+                  style={{
+                    position: "absolute",
+                    left: `${(h / 24) * 100}%`,
+                    transform: "translateX(-50%)",
+                    fontSize: 10,
+                    color: "#636e7b",
+                    fontFamily: "monospace",
+                    userSelect: "none",
+                  }}
+                >
+                  {h}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* 行（曜日×時間） */}
+          {DAY_LABELS.map((dayLabel, d) => (
+            <div
+              key={d}
+              style={{ display: "grid", gridTemplateColumns: "22px 1fr", gap: 3, marginBottom: 2 }}
+            >
+              {/* 曜日ラベル */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 11,
+                  color: d >= 5 ? "#7c8cf5" : "#636e7b",
+                  fontFamily: "sans-serif",
+                  userSelect: "none",
+                  fontWeight: d >= 5 ? 700 : 400,
+                }}
+              >
+                {dayLabel}
+              </div>
+
+              {/* セル */}
+              <div style={{ display: "flex", gap: 2 }}>
+                {Array.from({ length: 24 }, (_, h) => {
+                  const norm = loading ? 0 : display.normalized[d][h];
+                  const count = loading ? 0 : display.matrix[d][h];
+                  const isHovered = hovered?.day === d && hovered?.hour === h;
+                  const cellStyle = getCellStyle(norm);
+
+                  return (
+                    <div
+                      key={h}
+                      onMouseEnter={() => setHovered({ day: d, hour: h })}
+                      onMouseLeave={() => setHovered(null)}
+                      style={{
+                        flex: 1,
+                        aspectRatio: "1 / 1",
+                        borderRadius: 3,
+                        background: loading ? "rgba(22,27,34,0.5)" : cellStyle.background,
+                        boxShadow: isHovered
+                          ? "0 0 12px rgba(88,101,242,0.7)"
+                          : cellStyle.boxShadow,
+                        transform: isHovered ? "scaleY(1.2)" : "scaleY(1)",
+                        transition: "transform 0.1s ease, box-shadow 0.1s ease",
+                        cursor: count > 0 ? "pointer" : "default",
+                        animation: loading
+                          ? `pulse 1.5s ease-in-out ${(d * 24 + h) * 8}ms infinite`
+                          : "none",
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
 
         {DAY_LABELS.map((dayLabel, d) => (
@@ -177,45 +262,8 @@ export default function DiscordHeatmap() {
                 fontWeight: (isCurrent && d === now.day) || d >= 5 ? 700 : 400,
               }}
             >
-              {dayLabel}
-            </div>
-
-            <div style={{ display: "flex", gap: 2 }}>
-              {Array.from({ length: 24 }, (_, h) => {
-                const norm = loading ? 0 : display.normalized[d][h];
-                const count = loading ? 0 : display.matrix[d][h];
-                const isHovered = hovered?.day === d && hovered?.hour === h;
-                const isNow = isCurrent && now.day === d && now.hour === h;
-                const cellStyle = getCellStyle(norm);
-
-                return (
-                  <div
-                    key={h}
-                    onMouseEnter={() => setHovered({ day: d, hour: h })}
-                    onMouseLeave={() => setHovered(null)}
-                    style={{
-                      flex: 1,
-                      aspectRatio: "1 / 1",
-                      borderRadius: 3,
-                      background: loading ? "rgba(22,27,34,0.5)" : cellStyle.background,
-                      outline: isNow ? "2px solid rgba(255,255,255,0.9)" : "none",
-                      outlineOffset: isNow ? "1px" : "0",
-                      zIndex: isNow ? 1 : 0,
-                      boxShadow: isHovered
-                        ? "0 0 0 1.5px rgba(88,101,242,0.8), 0 0 8px rgba(88,101,242,0.5)"
-                        : cellStyle.boxShadow,
-                      transition: "box-shadow 0.12s ease",
-                      cursor: count > 0 ? "pointer" : "default",
-                      animation: loading
-                        ? `pulse 1.5s ease-in-out ${(d * 24 + h) * 8}ms infinite`
-                        : isNow
-                          ? "pulse-now 2s ease-in-out infinite"
-                          : "none",
-                    }}
-                  />
-                );
-              })}
-            </div>
+              {display.matrix[hovered.day][hovered.hour].toLocaleString()} 人
+            </span>
           </div>
         ))}
       </div>
