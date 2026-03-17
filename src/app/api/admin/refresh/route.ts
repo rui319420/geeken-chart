@@ -6,6 +6,7 @@ import { getContributionData } from "@/lib/github-graphql";
 import { buildHistoricalSnapshots } from "@/lib/github-history";
 import redis from "@/lib/redis";
 import { fetchUserGitHubStats, calculateGitHubScore } from "@/lib/githubStats";
+import { getUserFrameworkStats } from "@/lib/github-deps";
 import pLimit from "p-limit";
 
 export const maxDuration = 60;
@@ -15,6 +16,7 @@ type RefreshResult = {
   languages: number;
   commits: number;
   snapshotMonths: number;
+  frameworks: number;
   usedPrivateToken: boolean;
   error?: string;
 };
@@ -64,6 +66,7 @@ export async function POST() {
           languages: 0,
           commits: 0,
           snapshotMonths: 0,
+          frameworks: 0,
           usedPrivateToken: usePrivate,
         };
 
@@ -94,10 +97,6 @@ export async function POST() {
 
         // ──────────────────────────────────────────────────────────────────
         // 2. 過去12ヶ月分の言語ヒストリーを LanguageSnapshot に保存（折れ線グラフ用）
-        //
-        //    github-history.ts が各リポジトリの created_at を使って
-        //    「その月末時点で存在していたリポジトリ」を集計する。
-        //    → 後から参加したユーザーでも即座に過去データが生成される。
         // ──────────────────────────────────────────────────────────────────
         try {
           const historicalSnapshots = await buildHistoricalSnapshots(githubName, token, {
@@ -107,7 +106,6 @@ export async function POST() {
             concurrency: 5,
           });
 
-          // upsert: 同じ (userId, language, month) は上書き
           await Promise.all(
             historicalSnapshots.flatMap(({ month, languages }) =>
               Object.entries(languages).map(([language, bytes]) =>
@@ -145,12 +143,13 @@ export async function POST() {
           result.error = appendError(result.error, `contributions: ${errorMsg(e)}`);
         }
 
-        // ランキング用 GitHub Stats の取得と保存
+        // ──────────────────────────────────────────────────────────────────
+        // 4. ランキング用 GitHub Stats の取得と保存
+        // ──────────────────────────────────────────────────────────────────
         try {
           const stats = await fetchUserGitHubStats(githubName, token);
           const score = calculateGitHubScore(stats);
 
-          // データベースの User テーブルを更新する
           await prisma.user.update({
             where: { id: user.id },
             data: {
@@ -167,13 +166,38 @@ export async function POST() {
           result.error = appendError(result.error, `stats: ${errorMsg(e)}`);
         }
 
+        // ──────────────────────────────────────────────────────────────────
+        // 5. フレームワーク・ライブラリの依存情報を取得して保存
+        // ──────────────────────────────────────────────────────────────────
+        try {
+          const frameworkStats = await getUserFrameworkStats(githubName, token, 5);
+
+          await prisma.frameworkUsage.deleteMany({ where: { userId: user.id } });
+
+          if (frameworkStats.length > 0) {
+            await prisma.frameworkUsage.createMany({
+              data: frameworkStats.map((f) => ({
+                userId: user.id,
+                framework: f.framework,
+                ecosystem: f.ecosystem,
+                repoCount: f.repoCount,
+              })),
+            });
+          }
+
+          result.frameworks = frameworkStats.length;
+        } catch (e) {
+          console.error(`Framework fetch failed for ${githubName}:`, e);
+          result.error = appendError(result.error, `frameworks: ${errorMsg(e)}`);
+        }
+
         results.push(result);
       }),
     ),
   );
 
   // ──────────────────────────────────────────────────────────────────
-  // 4. 集計キャッシュをクリア
+  // 6. 集計キャッシュをクリア
   // ──────────────────────────────────────────────────────────────────
   await Promise.all([
     redis.del("stats:dashboard"),
@@ -181,7 +205,7 @@ export async function POST() {
     redis.del("languages:all:aggregated:average"),
     redis.del("languages:trend"),
     redis.del("discord:heatmap:aggregated"),
-    redis.del("discord:heatmap:current-week"),
+    redis.del("frameworks:all:aggregated"),
     ...users.map((u) => redis.del(`repos:count:${u.githubName}`)),
   ]);
 
