@@ -9,9 +9,9 @@ export async function GET(request: Request) {
     const yearParam = searchParams.get("year");
     const year = yearParam ? parseInt(yearParam) : null;
 
-    // GitHub名と、匿名かどうかの判定に使う showCommits を取得
     const users = await prisma.user.findMany({
-      select: { githubName: true, showCommits: true },
+      where: { showCommits: true },
+      select: { githubName: true, isAnonymous: true },
     });
 
     const GITHUB_TOKEN = process.env.GITHUB_ACCESS_TOKEN;
@@ -71,7 +71,7 @@ export async function GET(request: Request) {
               dailyStats[day.date].topUser = {
                 githubName: user.githubName,
                 count: day.contributionCount,
-                isAnonymous: !user.showCommits,
+                isAnonymous: user.isAnonymous,
               };
             }
           }
