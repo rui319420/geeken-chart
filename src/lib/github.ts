@@ -260,37 +260,3 @@ export async function getUserLanguageStats(
     fetchedAt: new Date().toISOString(),
   };
 }
-
-// ─────────────────────────────────────────────
-// フォーマット用ヘルパー
-// ─────────────────────────────────────────────
-
-/**
- * 集計結果をコンソール用のサマリーテキストに変換する
- */
-export function formatReport(report: UserLanguageReport): string {
-  const lines: string[] = [
-    `═══════════════════════════════════════════`,
-    `  GitHub Language Stats — @${report.username}`,
-    `═══════════════════════════════════════════`,
-    `  Repos   : ${report.analyzedRepos} / ${report.totalRepos} analyzed`,
-    `  Total   : ${report.totalBytes.toLocaleString()} bytes`,
-    `  Fetched : ${report.fetchedAt}`,
-    `───────────────────────────────────────────`,
-  ];
-
-  report.stats.slice(0, 10).forEach((s, i) => {
-    const bar = "█".repeat(Math.round(s.percentage / 2));
-    lines.push(
-      `  ${String(i + 1).padStart(2)}. ${s.language.padEnd(18)} ` +
-        `${s.percentage.toFixed(1).padStart(5)}%  ${bar}`,
-    );
-  });
-
-  if (report.stats.length > 10) {
-    lines.push(`      ... and ${report.stats.length - 10} more languages`);
-  }
-
-  lines.push(`═══════════════════════════════════════════`);
-  return lines.join("\n");
-}
