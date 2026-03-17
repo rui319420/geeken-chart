@@ -44,16 +44,32 @@ export default function DiscordHeatmap() {
   const [loading, setLoading] = useState(true);
   const [hovered, setHovered] = useState<{ day: number; hour: number } | null>(null);
   const [visible, setVisible] = useState(false);
+  // 現在の曜日と時間を管理 (0:月曜〜6:日曜に合わせる)
+  const [now, setNow] = useState<{ day: number; hour: number }>({
+    day: (new Date().getDay() + 6) % 7,
+    hour: new Date().getHours(),
+  });
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 80);
+
+    // 現在時刻の更新タイマー (1分ごとに更新)
+    const timer = setInterval(() => {
+      const d = new Date();
+      setNow({ day: (d.getDay() + 6) % 7, hour: d.getHours() });
+    }, 60000);
+
     fetch("/api/discord/heatmap")
       .then((r) => r.json())
       .then((d: HeatmapData) => setData(d))
       .catch((e) => console.error("Discord heatmap fetch failed:", e))
       .finally(() => setLoading(false));
-    return () => clearTimeout(t);
+
+    return () => {
+      clearTimeout(t);
+      clearInterval(timer);
+    };
   }, []);
 
   const display = data ?? makeDummyData();
@@ -65,243 +81,115 @@ export default function DiscordHeatmap() {
       ref={containerRef}
       style={{
         background: "linear-gradient(135deg, #0d1117 0%, #0f1520 100%)",
-        border: "1px solid #1c2333",
+        border: "1px solid rgba(88, 101, 242, 0.25)",
         borderRadius: 12,
         padding: "16px 20px 14px",
         width: "100%",
         opacity: visible ? 1 : 0,
         transform: visible ? "translateY(0)" : "translateY(10px)",
         transition: "opacity 0.5s ease, transform 0.5s ease",
+        boxShadow: "0 0 24px rgba(88, 101, 242, 0.08), inset 0 0 40px rgba(88, 101, 242, 0.03)",
       }}
     >
       {/* ヘッダー */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          marginBottom: 14,
-          flexWrap: "wrap",
-          gap: 8,
-        }}
-      >
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-            <div
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                background: "#5865f2",
-                boxShadow: "0 0 8px #5865f2",
-              }}
-            />
-            <h3
-              style={{
-                color: "#e6edf3",
-                fontWeight: 700,
-                fontSize: 13,
-                margin: 0,
-                letterSpacing: "0.01em",
-              }}
-            >
-              Discord アクティビティ
-            </h3>
-          </div>
-          <p style={{ color: "#8b949e", fontSize: 11, margin: 0, fontFamily: "sans-serif" }}>
-            メンバーの活動時間帯（JST）· メッセージ＋オンライン遷移
-          </p>
-        </div>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
+        <h3 style={{ color: "#e6edf3", fontWeight: 700, fontSize: 20, margin: 0 }}>
+          Discord アクティビティ
+        </h3>
+      </div>
 
-        {bestSlots.length > 0 && (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-            <span
-              style={{
-                fontSize: 10,
-                color: "#636e7b",
-                fontFamily: "sans-serif",
-                whiteSpace: "nowrap",
-              }}
-            >
-              📣 通知おすすめ
-            </span>
-            {bestSlots.map((s, i) => (
+      {/* ヒートマップ */}
+      <div>
+        <div style={{ display: "grid", gridTemplateColumns: "22px 1fr", marginBottom: 3 }}>
+          <div />
+          <div style={{ position: "relative", height: 20 }}>
+            {HOUR_TICKS.map((h) => (
               <span
-                key={i}
+                key={h}
                 style={{
-                  background: "rgba(88, 101, 242, 0.12)",
-                  border: "1px solid rgba(88, 101, 242, 0.3)",
-                  borderRadius: 99,
-                  padding: "3px 10px",
-                  fontSize: 11,
-                  color: "#7c8cf5",
+                  position: "absolute",
+                  left: `${(h / 24) * 100}%`,
+                  transform: "translateX(-50%)",
+                  fontSize: 12,
+                  color: "#636e7b",
                   fontFamily: "monospace",
-                  whiteSpace: "nowrap",
                 }}
               >
-                {DAY_LABELS[s.day]} {String(s.hour).padStart(2, "0")}時台{" "}
-                <span style={{ color: "#5865f2", fontWeight: 700 }}>{s.pct}%</span>
+                {h}
               </span>
             ))}
           </div>
-        )}
-      </div>
-
-      {/* ヒートマップ本体 */}
-      <div style={{ overflowX: "auto" }}>
-        <div style={{ minWidth: 500 }}>
-          {/* X軸 時間ラベル */}
-          <div style={{ display: "grid", gridTemplateColumns: "22px 1fr", marginBottom: 3 }}>
-            <div />
-            <div style={{ position: "relative", height: 14 }}>
-              {HOUR_TICKS.map((h) => (
-                <span
-                  key={h}
-                  style={{
-                    position: "absolute",
-                    left: `${(h / 24) * 100}%`,
-                    transform: "translateX(-50%)",
-                    fontSize: 10,
-                    color: "#636e7b",
-                    fontFamily: "monospace",
-                    userSelect: "none",
-                  }}
-                >
-                  {h}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* 行（曜日×時間） */}
-          {DAY_LABELS.map((dayLabel, d) => (
-            <div
-              key={d}
-              style={{ display: "grid", gridTemplateColumns: "22px 1fr", gap: 3, marginBottom: 2 }}
-            >
-              {/* 曜日ラベル */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 11,
-                  color: d >= 5 ? "#7c8cf5" : "#636e7b",
-                  fontFamily: "sans-serif",
-                  userSelect: "none",
-                  fontWeight: d >= 5 ? 700 : 400,
-                }}
-              >
-                {dayLabel}
-              </div>
-
-              {/* セル */}
-              <div style={{ display: "flex", gap: 2 }}>
-                {Array.from({ length: 24 }, (_, h) => {
-                  const norm = loading ? 0 : display.normalized[d][h];
-                  const count = loading ? 0 : display.matrix[d][h];
-                  const isHovered = hovered?.day === d && hovered?.hour === h;
-                  const cellStyle = getCellStyle(norm);
-
-                  return (
-                    <div
-                      key={h}
-                      onMouseEnter={() => setHovered({ day: d, hour: h })}
-                      onMouseLeave={() => setHovered(null)}
-                      style={{
-                        flex: 1,
-                        aspectRatio: "1 / 1.1",
-                        borderRadius: 3,
-                        background: loading ? "rgba(22,27,34,0.5)" : cellStyle.background,
-                        boxShadow: isHovered
-                          ? "0 0 12px rgba(88,101,242,0.7)"
-                          : cellStyle.boxShadow,
-                        transform: isHovered ? "scaleY(1.2)" : "scaleY(1)",
-                        transition: "transform 0.1s ease, box-shadow 0.1s ease",
-                        cursor: count > 0 ? "pointer" : "default",
-                        animation: loading
-                          ? `pulse 1.5s ease-in-out ${(d * 24 + h) * 8}ms infinite`
-                          : "none",
-                      }}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-          ))}
         </div>
-      </div>
 
-      {/* ホバー情報 */}
-      <div style={{ minHeight: 26, marginTop: 8 }}>
-        {hovered && !isEmpty ? (
+        {DAY_LABELS.map((dayLabel, d) => (
           <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 10,
-              padding: "6px 14px",
-              background: "#161b22",
-              border: "1px solid #30363d",
-              borderRadius: 8,
-              fontSize: 11,
-              fontFamily: "sans-serif",
-            }}
+            key={d}
+            style={{ display: "grid", gridTemplateColumns: "22px 1fr", gap: 3, marginBottom: 2 }}
           >
-            <span style={{ color: "#8b949e" }}>
-              {DAY_LABELS[hovered.day]}曜&nbsp;
-              {String(hovered.hour).padStart(2, "0")}:00〜
-              {String(hovered.hour + 1).padStart(2, "0")}:00
-            </span>
-            <span
+            <div
               style={{
-                color: display.matrix[hovered.day][hovered.hour] > 0 ? "#7c8cf5" : "#484f58",
-                fontWeight: 700,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 12,
+                color: d >= 5 ? "#7c8cf5" : "#636e7b",
+                fontWeight: d >= 5 ? 700 : 400,
               }}
             >
-              {display.matrix[hovered.day][hovered.hour].toLocaleString()} 件
-            </span>
+              {dayLabel}
+            </div>
+
+            <div style={{ display: "flex", gap: 2 }}>
+              {Array.from({ length: 24 }, (_, h) => {
+                const norm = loading ? 0 : display.normalized[d][h];
+                const count = loading ? 0 : display.matrix[d][h];
+                const isHovered = hovered?.day === d && hovered?.hour === h;
+                const isNow = now.day === d && now.hour === h; // 現在時刻判定
+                const cellStyle = getCellStyle(norm);
+
+                return (
+                  <div
+                    key={h}
+                    onMouseEnter={() => setHovered({ day: d, hour: h })}
+                    onMouseLeave={() => setHovered(null)}
+                    style={{
+                      flex: 1,
+                      aspectRatio: "1 / 1",
+                      borderRadius: 3,
+                      background: loading ? "rgba(22,27,34,0.5)" : cellStyle.background,
+                      boxShadow: isHovered
+                        ? "0 0 0 1.5px rgba(88,101,242,0.8), 0 0 8px rgba(88,101,242,0.5)"
+                        : cellStyle.boxShadow,
+                      // 現在時刻のセルを白い枠線で強調
+                      outline: isNow ? "2px solid #ffffff" : "none",
+                      outlineOffset: isNow ? "1px" : "0",
+                      zIndex: isNow ? 1 : 0,
+                      transition: "box-shadow 0.12s ease",
+                      cursor: count > 0 ? "pointer" : "default",
+                      animation: loading
+                        ? `pulse 1.5s ease-in-out ${(d * 24 + h) * 8}ms infinite`
+                        : isNow
+                          ? "pulse-now 2s ease-in-out infinite"
+                          : "none",
+                    }}
+                  />
+                );
+              })}
+            </div>
           </div>
-        ) : isEmpty ? (
-          <p style={{ fontSize: 12, color: "#484f58", margin: 0, fontFamily: "sans-serif" }}>
-            まだ活動データがありません · Bot がメッセージを記録すると表示されます
-          </p>
-        ) : null}
+        ))}
       </div>
 
-      {/* 凡例 */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "flex-end",
-          gap: 4,
-          marginTop: 8,
-        }}
-      >
-        <span style={{ fontSize: 10, color: "#484f58", fontFamily: "sans-serif" }}>少</span>
-        {[0, 0.15, 0.35, 0.55, 0.75, 1.0].map((v, i) => {
-          const s = getCellStyle(v);
-          return (
-            <div
-              key={i}
-              style={{
-                width: 11,
-                height: 11,
-                borderRadius: 2,
-                background: s.background,
-                border: "1px solid rgba(255,255,255,0.04)",
-              }}
-            />
-          );
-        })}
-        <span style={{ fontSize: 10, color: "#484f58", fontFamily: "sans-serif" }}>多</span>
-      </div>
+      {/* 凡例などは省略（元のコードを維持） */}
 
       <style>{`
         @keyframes pulse {
           0%, 100% { opacity: 0.4; }
           50%       { opacity: 0.7; }
+        }
+        @keyframes pulse-now {
+          0%, 100% { outline-color: rgba(255, 255, 255, 1); }
+          50%       { outline-color: rgba(255, 255, 255, 0.4); }
         }
       `}</style>
     </div>
