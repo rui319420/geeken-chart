@@ -65,7 +65,7 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent, // Privileged: Message Content Intent
-    GatewayIntentBits.GuildMembers, // Privileged: Server Members Intent
+    GatewayIntentBits.GuildMembers,   // Privileged: Server Members Intent
     GatewayIntentBits.GuildPresences, // Privileged: Presence Intent
   ],
   partials: [Partials.Message, Partials.Channel, Partials.GuildMember],
@@ -115,7 +115,7 @@ async function registerCommands() {
 
 /**
  * UTC の Date を JST の { dayOfWeek, hour } に変換する
- * dayOfWeek: 0=月, 1=火, ..., 6=日 (DB スキーマに合わせる)
+ * dayOfWeek: 0=月, 1=火, ..., 6=日
  */
 function toJstActivity(date: Date): { dayOfWeek: number; hour: number } {
   const jstDate = new Date(date.getTime() + 9 * 60 * 60 * 1000);
@@ -123,6 +123,23 @@ function toJstActivity(date: Date): { dayOfWeek: number; hour: number } {
   const dayOfWeek = (jsDay + 6) % 7; // 0=月, ..., 6=日
   const hour = jstDate.getUTCHours();
   return { dayOfWeek, hour };
+}
+
+/**
+ * JST の ISO 週キー ("2026-W11" 形式) を返す
+ * 週の区切りは月曜始まり
+ */
+function getWeekKey(date: Date): string {
+  const jst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  const day = jst.getUTCDay(); // 0=Sun
+  const monday = new Date(jst);
+  monday.setUTCDate(jst.getUTCDate() - (day + 6) % 7);
+  const year = monday.getUTCFullYear();
+  const startOfYear = new Date(Date.UTC(year, 0, 1));
+  const weekNo = Math.ceil(
+    ((monday.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getUTCDay() + 1) / 7,
+  );
+  return `${year}-W${String(weekNo).padStart(2, "0")}`;
 }
 
 // ──────────────────────────────────────
@@ -157,12 +174,13 @@ async function getLinkedUserId(discordId: string): Promise<string | null> {
 
 async function recordMessage(discordId: string, timestamp: number): Promise<void> {
   const { dayOfWeek, hour } = toJstActivity(new Date(timestamp));
+  const weekKey = getWeekKey(new Date(timestamp));
 
   // 全員分を RawDiscordActivity へ
   await prisma.rawDiscordActivity.upsert({
-    where: { discordId_dayOfWeek_hour: { discordId, dayOfWeek, hour } },
+    where: { discordId_weekKey_dayOfWeek_hour: { discordId, weekKey, dayOfWeek, hour } },
     update: { messageCount: { increment: 1 } },
-    create: { discordId, dayOfWeek, hour, messageCount: 1 },
+    create: { discordId, weekKey, dayOfWeek, hour, messageCount: 1 },
   });
 
   // /link 済みは DiscordActivity にも二重書き
@@ -187,9 +205,6 @@ async function pollOnlineMembers(): Promise<void> {
   try {
     const guild = await client.guilds.fetch(GUILD_ID);
 
-    // presenceキャッシュを最新に更新
-    await guild.members.fetch();
-
     const onlineMembers = guild.members.cache.filter(
       (m) =>
         !m.user.bot &&
@@ -204,28 +219,31 @@ async function pollOnlineMembers(): Promise<void> {
       return;
     }
 
-    const { dayOfWeek, hour } = toJstActivity(new Date());
+    const now = new Date();
+    const { dayOfWeek, hour } = toJstActivity(now);
+    const weekKey = getWeekKey(now);
 
     // オンラインだった各メンバーの presenceCount を +1
     await Promise.all(
       onlineMembers.map((member) =>
         prisma.rawDiscordActivity.upsert({
           where: {
-            discordId_dayOfWeek_hour: {
+            discordId_weekKey_dayOfWeek_hour: {
               discordId: member.id,
+              weekKey,
               dayOfWeek,
               hour,
             },
           },
           update: { presenceCount: { increment: 1 } },
-          create: { discordId: member.id, dayOfWeek, hour, presenceCount: 1 },
+          create: { discordId: member.id, weekKey, dayOfWeek, hour, presenceCount: 1 },
         }),
       ),
     );
 
     console.log(
       `[Bot] ポーリング完了: ${onlineCount}人オンライン` +
-        ` (${DAY_LABELS[dayOfWeek]} ${hour}時台)`,
+        ` (${DAY_LABELS[dayOfWeek]} ${hour}時台, ${weekKey})`,
     );
   } catch (err) {
     console.error("[Bot] ポーリング失敗:", err);

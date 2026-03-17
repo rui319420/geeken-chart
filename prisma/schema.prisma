@@ -43,13 +43,13 @@ model User {
 	discordId String? @unique
 
   // ランキング用 GitHub Stats データ
-  totalStars    Int       @default(0)
-  totalCommits  Int       @default(0)
-  totalPRs      Int       @default(0)
-  totalIssues   Int       @default(0)
-  githubScore   Int       @default(0) // ランキングのソート用総合スコア
-  statsUpdatedAt DateTime @default(now()) // いつ計算したデータか
-
+  githubScore     Int?
+  totalCommits    Int?
+  totalStars      Int?
+  totalPRs        Int?
+  totalIssues     Int?
+  statsUpdatedAt  DateTime?
+	
   @@index([joinRanking, githubScore(sort: Desc)])
 }
 
@@ -138,11 +138,12 @@ model VerificationToken {
 model RawDiscordActivity {
   id            String   @id @default(cuid())
   discordId     String
+  weekKey       String   @default("")
   dayOfWeek     Int
   hour          Int
   messageCount  Int      @default(0)
   presenceCount Int      @default(0)
   updatedAt     DateTime @updatedAt
 
-  @@unique([discordId, dayOfWeek, hour])
+  @@unique([discordId, weekKey, dayOfWeek, hour])
 }
