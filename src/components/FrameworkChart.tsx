@@ -261,7 +261,7 @@ export default function FrameworkChart() {
   const chartHeight = Math.max(sorted.length * 36 + 40, 160);
 
   return (
-    <div className="w-full rounded-xl border border-[#21262d] bg-[#0d1117] p-5">
+    <div className="w-full rounded-xl border border-[#2ea043]/40 bg-gradient-to-br from-[#0d1117] to-[#181a26] p-5 shadow-[0_0_24px_rgba(46,160,67,0.15)]">
       <h3 className="mb-1 text-base font-bold text-[#e6edf3]">使用フレームワーク（全体）</h3>
       <p className="mb-4 text-xs text-[#8b949e]">
         各メンバーのリポジトリの依存ファイルから集計（リポジトリ数）
@@ -279,8 +279,10 @@ export default function FrameworkChart() {
                 onClick={() => setSortKey(key)}
                 className="rounded-md px-3 py-1 text-xs font-medium transition-all duration-150"
                 style={{
-                  background: sortKey === key ? "#21262d" : "transparent",
-                  color: sortKey === key ? "#e6edf3" : "#636e7b",
+                  background: sortKey === key ? "rgba(46,160,67,0.2)" : "transparent",
+                  color: sortKey === key ? "#3fb950" : "#636e7b",
+                  border:
+                    sortKey === key ? "1px solid rgba(46,160,67,0.4)" : "1px solid transparent",
                 }}
               >
                 {SORT_LABELS[key]}
@@ -342,7 +344,7 @@ export default function FrameworkChart() {
           <BarChart
             data={sorted}
             layout="vertical"
-            margin={{ top: 0, right: 48, left: 100, bottom: 0 }}
+            margin={{ top: 0, right: 48, left: 100, bottom: 10 }}
           >
             <XAxis
               type="number"
@@ -352,7 +354,7 @@ export default function FrameworkChart() {
               allowDecimals={false}
               label={{
                 value: "リポジトリ数",
-                position: "insideRight",
+                position: "insideBottomLeft",
                 offset: -4,
                 fill: "#636e7b",
                 fontSize: 11,
