@@ -102,11 +102,20 @@ export async function GET(request: Request) {
           else level = 1;
         }
       }
+
+      const safeTopUser = entry.topUser
+        ? {
+            count: entry.topUser.count,
+            isAnonymous: entry.topUser.isAnonymous,
+            githubName: entry.topUser.isAnonymous ? "anonymous" : entry.topUser.githubName,
+          }
+        : null;
+
       return {
         date: entry.date,
         count: entry.totalCount,
         level,
-        topUser: entry.topUser,
+        topUser: safeTopUser,
       };
     });
 
