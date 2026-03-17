@@ -10,6 +10,7 @@ import RefreshButton from "@/components/RefreshButton";
 import PrivacySettings from "@/components/PrivacySettings";
 import DiscordHeatmap from "@/components/DiscordHeatmap";
 import RankingBoard from "@/components/RankingBoard";
+import FrameworkChart from "@/components/FrameworkChart";
 
 function MemberList() {
   const members = [{ name: "rui319420", avatar: "https://github.com/rui319420.png" }];
@@ -136,6 +137,10 @@ export default async function HomePage() {
 
           <section className="mb-6">
             <PrivacySettings />
+          </section>
+
+          <section className="mb-6">
+            <FrameworkChart />
           </section>
 
           {isDev && (

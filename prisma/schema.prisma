@@ -50,6 +50,9 @@ model User {
   totalIssues     Int?
   statsUpdatedAt  DateTime?
 
+	// フレームワーク
+  frameworks FrameworkUsage[]
+
   @@index([joinRanking, githubScore(sort: Desc)])
 }
 
@@ -146,4 +149,17 @@ model RawDiscordActivity {
   updatedAt     DateTime @updatedAt
 
   @@unique([discordId, weekKey, dayOfWeek, hour])
+}
+
+model FrameworkUsage {
+  id          String   @id @default(cuid())
+  userId      String
+  framework   String   // "React", "FastAPI" など
+  ecosystem   String   // "npm", "pip", "cargo" など
+  repoCount   Int      @default(1)
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, framework])
 }
