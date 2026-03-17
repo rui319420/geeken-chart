@@ -205,9 +205,6 @@ async function pollOnlineMembers(): Promise<void> {
   try {
     const guild = await client.guilds.fetch(GUILD_ID);
 
-    // presenceキャッシュを最新に更新
-    await guild.members.fetch();
-
     const onlineMembers = guild.members.cache.filter(
       (m) =>
         !m.user.bot &&
