@@ -1,11 +1,8 @@
+import redis from "./redis";
+
 const GITHUB_API = "https://api.github.com";
 
-// ────────────────────────────────────────────────────
-// npm: パッケージ名 → 表示名のマップ
-// スコープ付き (@nestjs/core など) も対応
-// ────────────────────────────────────────────────────
 const NPM_MAP: Record<string, string> = {
-  // フロントエンドフレームワーク
   react: "React",
   vue: "Vue",
   svelte: "Svelte",
@@ -13,15 +10,11 @@ const NPM_MAP: Record<string, string> = {
   astro: "Astro",
   qwik: "Qwik",
   jquery: "jQuery",
-
-  // メタフレームワーク
   next: "Next.js",
   nuxt: "Nuxt",
   remix: "Remix",
   "@sveltejs/kit": "SvelteKit",
   gatsby: "Gatsby",
-
-  // バックエンドフレームワーク
   express: "Express",
   fastify: "Fastify",
   hono: "Hono",
@@ -30,8 +23,6 @@ const NPM_MAP: Record<string, string> = {
   "socket.io": "Socket.io",
   "socket.io-client": "Socket.io",
   ws: "ws",
-
-  // ORM / DB
   prisma: "Prisma",
   "@prisma/client": "Prisma",
   "drizzle-orm": "Drizzle",
@@ -40,8 +31,6 @@ const NPM_MAP: Record<string, string> = {
   mongoose: "Mongoose",
   knex: "Knex",
   "better-sqlite3": "SQLite",
-
-  // 状態管理
   "@reduxjs/toolkit": "Redux Toolkit",
   redux: "Redux",
   zustand: "Zustand",
@@ -49,8 +38,6 @@ const NPM_MAP: Record<string, string> = {
   recoil: "Recoil",
   mobx: "MobX",
   xstate: "XState",
-
-  // データフェッチ / API
   "@tanstack/react-query": "TanStack Query",
   swr: "SWR",
   axios: "Axios",
@@ -60,8 +47,6 @@ const NPM_MAP: Record<string, string> = {
   graphql: "GraphQL",
   "@apollo/client": "Apollo Client",
   "apollo-server": "Apollo Server",
-
-  // UIライブラリ
   "@mui/material": "MUI",
   "@chakra-ui/react": "Chakra UI",
   "chakra-ui": "Chakra UI",
@@ -71,63 +56,43 @@ const NPM_MAP: Record<string, string> = {
   "@radix-ui/react-dialog": "Radix UI",
   "framer-motion": "Framer Motion",
   "lucide-react": "Lucide",
-
-  // スタイリング
   tailwindcss: "Tailwind CSS",
   "styled-components": "styled-components",
   "@emotion/react": "Emotion",
   sass: "Sass",
-
-  // ビルドツール
   vite: "Vite",
   webpack: "webpack",
   esbuild: "esbuild",
   turbopack: "Turbopack",
   rollup: "Rollup",
   parcel: "Parcel",
-
-  // テスト
   vitest: "Vitest",
   jest: "Jest",
   "@playwright/test": "Playwright",
   cypress: "Cypress",
   "@testing-library/react": "Testing Library",
-
-  // 型 / バリデーション
   zod: "Zod",
   yup: "Yup",
   "io-ts": "io-ts",
-
-  // ユーティリティ
   lodash: "Lodash",
   dayjs: "Day.js",
   "date-fns": "date-fns",
   rxjs: "RxJS",
-
-  // モバイル / デスクトップ
   "react-native": "React Native",
   expo: "Expo",
   electron: "Electron",
   "@tauri-apps/api": "Tauri",
-
-  // 3D / ビジュアライゼーション
   three: "Three.js",
   d3: "D3.js",
   recharts: "Recharts",
   "chart.js": "Chart.js",
-
-  // AI / LLM
   openai: "OpenAI SDK",
   "@anthropic-ai/sdk": "Anthropic SDK",
   langchain: "LangChain",
   ai: "Vercel AI SDK",
 };
 
-// ────────────────────────────────────────────────────
-// pip: パッケージ名 → 表示名
-// ────────────────────────────────────────────────────
 const PIP_MAP: Record<string, string> = {
-  // Webフレームワーク
   fastapi: "FastAPI",
   django: "Django",
   flask: "Flask",
@@ -135,8 +100,6 @@ const PIP_MAP: Record<string, string> = {
   tornado: "Tornado",
   aiohttp: "aiohttp",
   sanic: "Sanic",
-
-  // ORM / DB
   sqlalchemy: "SQLAlchemy",
   "django-rest-framework": "DRF",
   djangorestframework: "DRF",
@@ -147,8 +110,6 @@ const PIP_MAP: Record<string, string> = {
   "psycopg2-binary": "psycopg2",
   redis: "Redis (py)",
   celery: "Celery",
-
-  // データ / ML
   numpy: "NumPy",
   pandas: "pandas",
   matplotlib: "Matplotlib",
@@ -164,16 +125,12 @@ const PIP_MAP: Record<string, string> = {
   "sentence-transformers": "Sentence Transformers",
   xgboost: "XGBoost",
   lightgbm: "LightGBM",
-
-  // AI / LLM
   openai: "OpenAI SDK",
   anthropic: "Anthropic SDK",
   langchain: "LangChain",
   "langchain-core": "LangChain",
   llama_index: "LlamaIndex",
   llama_cpp_python: "llama.cpp",
-
-  // HTTP / スクレイピング
   requests: "Requests",
   httpx: "HTTPX",
   beautifulsoup4: "BeautifulSoup",
@@ -181,81 +138,47 @@ const PIP_MAP: Record<string, string> = {
   scrapy: "Scrapy",
   selenium: "Selenium",
   playwright: "Playwright (py)",
-
-  // バリデーション / シリアライズ
   pydantic: "Pydantic",
   marshmallow: "Marshmallow",
-
-  // テスト
   pytest: "pytest",
-  unittest2: "unittest",
-
-  // ユーティリティ
   pillow: "Pillow",
   boto3: "boto3",
   paramiko: "Paramiko",
   cryptography: "cryptography",
 };
 
-// ────────────────────────────────────────────────────
-// Cargo.toml: クレート名 → 表示名
-// ────────────────────────────────────────────────────
 const CARGO_MAP: Record<string, string> = {
-  // Webフレームワーク
   axum: "Axum",
   "actix-web": "Actix Web",
   rocket: "Rocket",
   warp: "Warp",
   hyper: "Hyper",
   poem: "Poem",
-
-  // 非同期ランタイム
   tokio: "Tokio",
   async_std: "async-std",
   smol: "smol",
-
-  // DB / ORM
   sqlx: "SQLx",
   diesel: "Diesel",
   sea_orm: "SeaORM",
-
-  // シリアライズ
   serde: "Serde",
   serde_json: "serde_json",
-
-  // HTTP クライアント
   reqwest: "Reqwest",
   ureq: "ureq",
-
-  // gRPC
   tonic: "Tonic",
-
-  // CLI
   clap: "Clap",
   structopt: "StructOpt",
-
-  // エラーハンドリング
   anyhow: "anyhow",
   thiserror: "thiserror",
-
-  // ログ / トレース
   tracing: "Tracing",
   log: "log",
   env_logger: "env_logger",
-
-  // 並列 / 非同期ユーティリティ
   rayon: "Rayon",
   crossbeam: "crossbeam",
-
-  // WebAssembly
   wasm_bindgen: "wasm-bindgen",
   "js-sys": "js-sys",
   "web-sys": "web-sys",
 };
 
-// ────────────────────────────────────────────────────
-// go.mod: モジュール名 → 表示名
-// ────────────────────────────────────────────────────
 const GO_MAP: Record<string, string> = {
   "github.com/gin-gonic/gin": "Gin",
   "github.com/labstack/echo": "Echo",
@@ -266,25 +189,15 @@ const GO_MAP: Record<string, string> = {
   "github.com/go-chi/chi/v5": "Chi",
   "github.com/gorilla/mux": "Gorilla Mux",
   "github.com/beego/beego": "Beego",
-
-  // ORM / DB
   "gorm.io/gorm": "GORM",
   "github.com/jmoiern/sqlx": "sqlx (Go)",
   "entgo.io/ent": "Ent",
   "go.mongodb.org/mongo-driver": "MongoDB Driver",
-
-  // gRPC
   "google.golang.org/grpc": "gRPC",
-
-  // CLI
   "github.com/spf13/cobra": "Cobra",
   "github.com/urfave/cli": "urfave/cli",
   "github.com/urfave/cli/v2": "urfave/cli",
-
-  // テスト
   "github.com/stretchr/testify": "Testify",
-
-  // その他
   "github.com/spf13/viper": "Viper",
   "go.uber.org/zap": "Zap",
   "github.com/rs/zerolog": "Zerolog",
@@ -295,15 +208,28 @@ export interface DepResult {
   ecosystem: "npm" | "pip" | "cargo" | "go";
 }
 
-// ────────────────────────────────────────────────────
-// ファイル1つを取得してテキストで返す
-// ────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────────
+// ファイル取得（Redis キャッシュ付き）
+// 404 のファイルも空文字でキャッシュして無駄なリクエストを防ぐ
+// ──────────────────────────────────────────────────────────────────
+
 async function fetchFileContent(
   owner: string,
   repo: string,
   path: string,
   token: string,
 ): Promise<string | null> {
+  const cacheKey = `depfile:${owner}:${repo}:${path}`;
+
+  try {
+    const cached = await redis.get<string>(cacheKey);
+    if (cached !== null && cached !== undefined) {
+      return cached === "" ? null : cached;
+    }
+  } catch {
+    // Redis エラーはスキップして API にフォールバック
+  }
+
   try {
     const res = await fetch(`${GITHUB_API}/repos/${owner}/${repo}/contents/${path}`, {
       headers: {
@@ -311,17 +237,28 @@ async function fetchFileContent(
         Accept: "application/vnd.github+json",
       },
     });
-    if (!res.ok) return null;
+
+    if (!res.ok) {
+      // ファイルなし（404 等）も短めにキャッシュ
+      await redis.set(cacheKey, "", { ex: 60 * 60 * 6 }).catch(() => {});
+      return null;
+    }
+
     const data = await res.json();
-    return Buffer.from(data.content, "base64").toString("utf-8");
+    const content = Buffer.from(data.content, "base64").toString("utf-8");
+
+    // 24時間キャッシュ
+    await redis.set(cacheKey, content, { ex: 60 * 60 * 24 }).catch(() => {});
+    return content;
   } catch {
     return null;
   }
 }
 
-// ────────────────────────────────────────────────────
-// package.json を解析
-// ────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────────
+// 各ファイルのパーサー
+// ──────────────────────────────────────────────────────────────────
+
 function parsePackageJson(content: string): DepResult[] {
   try {
     const pkg = JSON.parse(content);
@@ -345,9 +282,6 @@ function parsePackageJson(content: string): DepResult[] {
   }
 }
 
-// ────────────────────────────────────────────────────
-// requirements.txt を解析
-// ────────────────────────────────────────────────────
 function parseRequirementsTxt(content: string): DepResult[] {
   const seen = new Set<string>();
   const results: DepResult[] = [];
@@ -366,9 +300,6 @@ function parseRequirementsTxt(content: string): DepResult[] {
   return results;
 }
 
-// ────────────────────────────────────────────────────
-// Cargo.toml を解析
-// ────────────────────────────────────────────────────
 function parseCargoToml(content: string): DepResult[] {
   const seen = new Set<string>();
   const results: DepResult[] = [];
@@ -376,7 +307,6 @@ function parseCargoToml(content: string): DepResult[] {
 
   for (const line of depSection.split("\n")) {
     const name = line.split("=")[0].trim().toLowerCase().replace(/-/g, "_");
-    // ハイフンとアンダースコア両方で検索
     const key = Object.keys(CARGO_MAP).find((k) => k === name || k.replace(/-/g, "_") === name);
     if (key) {
       const displayName = CARGO_MAP[key];
@@ -389,17 +319,12 @@ function parseCargoToml(content: string): DepResult[] {
   return results;
 }
 
-// ────────────────────────────────────────────────────
-// go.mod を解析
-// ────────────────────────────────────────────────────
 function parseGoMod(content: string): DepResult[] {
   const seen = new Set<string>();
   const results: DepResult[] = [];
 
   for (const line of content.split("\n")) {
-    const trimmed = line.trim();
-    // "require module/path vX.X.X" または require ブロック内の行
-    const modulePath = trimmed.split(/\s+/)[0];
+    const modulePath = line.trim().split(/\s+/)[0];
     const displayName = GO_MAP[modulePath];
     if (displayName && !seen.has(displayName)) {
       seen.add(displayName);
@@ -409,12 +334,11 @@ function parseGoMod(content: string): DepResult[] {
   return results;
 }
 
-// ────────────────────────────────────────────────────
-// リポジトリ1つの依存を取得
-// ────────────────────────────────────────────────────
-async function fetchRepoDeps(owner: string, repoName: string, token: string): Promise<DepResult[]> {
-  const results: DepResult[] = [];
+// ──────────────────────────────────────────────────────────────────
+// リポジトリ1つの依存を取得（4ファイルを並列取得）
+// ──────────────────────────────────────────────────────────────────
 
+async function fetchRepoDeps(owner: string, repoName: string, token: string): Promise<DepResult[]> {
   const [pkgJson, reqTxt, cargo, goMod] = await Promise.all([
     fetchFileContent(owner, repoName, "package.json", token),
     fetchFileContent(owner, repoName, "requirements.txt", token),
@@ -422,6 +346,7 @@ async function fetchRepoDeps(owner: string, repoName: string, token: string): Pr
     fetchFileContent(owner, repoName, "go.mod", token),
   ]);
 
+  const results: DepResult[] = [];
   if (pkgJson) results.push(...parsePackageJson(pkgJson));
   if (reqTxt) results.push(...parseRequirementsTxt(reqTxt));
   if (cargo) results.push(...parseCargoToml(cargo));
@@ -430,17 +355,25 @@ async function fetchRepoDeps(owner: string, repoName: string, token: string): Pr
   return results;
 }
 
-// ────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────────
 // ユーザーの全リポジトリから依存を集計
-// repoCount = そのフレームワークを使っているリポジトリ数
-// ────────────────────────────────────────────────────
+// cachedRepos を渡すとリポジトリ一覧の再取得をスキップする
+// ──────────────────────────────────────────────────────────────────
+
 export async function getUserFrameworkStats(
   githubName: string,
   token: string,
   concurrency = 5,
+  cachedRepos?: { name: string }[],
 ): Promise<{ framework: string; ecosystem: string; repoCount: number }[]> {
-  const { fetchUserRepos } = await import("./github");
-  const repos = await fetchUserRepos(githubName, { token });
+  let repos: { name: string }[];
+
+  if (cachedRepos) {
+    repos = cachedRepos;
+  } else {
+    const { fetchUserRepos } = await import("./github");
+    repos = await fetchUserRepos(githubName, { token });
+  }
 
   const counter = new Map<string, { ecosystem: string; count: number }>();
 
