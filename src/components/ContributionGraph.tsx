@@ -18,10 +18,35 @@ const periodLabels: Record<Period, string> = {
   "1y": "1年",
 };
 
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: {
+    payload: DayData;
+    value: number;
+  }[];
+}
+
+interface CustomXAxisTickProps {
+  x?: number;
+  y?: number;
+  payload?: {
+    value: string;
+  };
+  data: DayData[];
+  period: Period;
+}
+
+interface TopUser {
+  count: number;
+  displayName: string;
+  avatarUrl: string | null;
+}
+
 interface ApiDay {
   date: string;
   count: number;
   level: 0 | 1 | 2 | 3 | 4;
+  topUser?: TopUser | null;
 }
 
 interface DayData {
@@ -29,7 +54,40 @@ interface DayData {
   count: number;
   label: string;
   dayLabel: string;
+  topUser?: TopUser | null;
 }
+
+//「匿」アイコン＆GitHubアイコンを表示する共通コンポーネント
+const TopUserAvatar = ({ topUser, size = 20 }: { topUser: TopUser; size?: number }) => {
+  if (!topUser.avatarUrl) {
+    return (
+      <div
+        style={{
+          width: size,
+          height: size,
+          borderRadius: "50%",
+          backgroundColor: "#30363d",
+          color: "#c9d1d9",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: size * 0.55,
+          fontWeight: "bold",
+          border: "1px solid #484f58",
+        }}
+      >
+        匿
+      </div>
+    );
+  }
+  return (
+    <img
+      src={topUser.avatarUrl}
+      alt={topUser.displayName}
+      style={{ width: size, height: size, borderRadius: "50%", border: "1px solid #484f58" }}
+    />
+  );
+};
 
 function apiToChartData(raw: ApiDay[]): DayData[] {
   return raw.map((d) => {
@@ -39,6 +97,7 @@ function apiToChartData(raw: ApiDay[]): DayData[] {
       count: d.count,
       label: `${dt.getMonth() + 1}/${dt.getDate()}`,
       dayLabel: String(dt.getDate()),
+      topUser: d.topUser,
     };
   });
 }
@@ -60,15 +119,24 @@ function filterByPeriod(data: DayData[], period: Period): DayData[] {
       const monday = new Date(dt);
       monday.setDate(dt.getDate() + diff);
       const key = monday.toISOString().split("T")[0];
+
       if (!weekly[key]) {
         weekly[key] = {
           date: key,
           count: 0,
           label: `${monday.getMonth() + 1}/${monday.getDate()}`,
           dayLabel: "",
+          topUser: null,
         };
       }
       weekly[key].count += d.count;
+
+      // 週間MVPの暫定計算：その週の中で一番1日のコミット数が多かった人を1位とする
+      if (d.topUser) {
+        if (!weekly[key].topUser || d.topUser.count > weekly[key].topUser!.count) {
+          weekly[key].topUser = d.topUser;
+        }
+      }
     });
     return Object.values(weekly).sort((a, b) => a.date.localeCompare(b.date));
   }
@@ -76,30 +144,69 @@ function filterByPeriod(data: DayData[], period: Period): DayData[] {
   return filtered;
 }
 
-const CustomTooltip = ({
-  active,
-  payload,
-}: {
-  active?: boolean;
-  payload?: { value?: number; payload?: { date?: string } }[];
-}) => {
+// X軸の下に日付とアイコンを描画するためのカスタムTick
+const CustomXAxisTick = (props: CustomXAxisTickProps) => {
+  const { x, y, payload, data, period } = props;
+
+  if (x === undefined || y === undefined || !payload) return null;
+
+  const pointData = data.find((d: DayData) => d.date === payload.value);
+
+  if (!pointData) return null;
+  const label = period === "1m" ? pointData.dayLabel : pointData.label;
+
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text x={0} y={0} dy={12} textAnchor="middle" fill="#8b949e" fontSize={11}>
+        {label}
+      </text>
+      {pointData.topUser && (
+        <foreignObject x={-10} y={18} width={20} height={20}>
+          <TopUserAvatar topUser={pointData.topUser} />
+        </foreignObject>
+      )}
+    </g>
+  );
+};
+
+const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   if (!active || !payload || payload.length === 0) return null;
+
+  const data = payload[0].payload;
+
   return (
     <div
       style={{
         background: "#161b22",
         border: "1px solid #30363d",
         borderRadius: 6,
-        padding: "6px 10px",
+        padding: "8px 12px",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
       }}
     >
-      <p style={{ color: "#8b949e", fontSize: 11, margin: 0 }}>{payload[0]?.payload?.date}</p>
-      <p style={{ color: "#3fb950", fontSize: 13, fontWeight: 700, margin: "2px 0 0" }}>
-        {payload[0]?.value}
+      <p style={{ color: "#8b949e", fontSize: 11, margin: 0 }}>{data.date}</p>
+      <p style={{ color: "#3fb950", fontSize: 14, fontWeight: 700, margin: "2px 0 0" }}>
+        {data.count}
         <span style={{ color: "#8b949e", fontSize: 11, fontWeight: 400, marginLeft: 4 }}>
           コミット
         </span>
       </p>
+      {/* ツールチップ内にも1位の人の情報を表示 */}
+      {data.topUser && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            marginTop: 8,
+            paddingTop: 8,
+            borderTop: "1px solid #30363d",
+          }}
+        >
+          <TopUserAvatar topUser={data.topUser} size={16} />
+          <span style={{ color: "#c9d1d9", fontSize: 11 }}>{data.topUser.displayName} が1位!</span>
+        </div>
+      )}
     </div>
   );
 };
@@ -111,7 +218,6 @@ export default function ContributionGraph() {
   const [isVisible, setIsVisible] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // 全期間データを1回だけ取得（ブラウザ側でフィルタ）
   useEffect(() => {
     fetch("/api/contributions/all")
       .then((r) => r.json())
@@ -140,7 +246,6 @@ export default function ContributionGraph() {
         transition: "opacity 0.5s ease",
       }}
     >
-      {/* ヘッダー */}
       <div
         style={{
           display: "flex",
@@ -178,7 +283,8 @@ export default function ContributionGraph() {
       </div>
 
       {/* グラフ */}
-      <div style={{ height: 220, width: "100%" }}>
+      <div style={{ height: 240, width: "100%" }}>
+        {" "}
         {loading ? (
           <div
             style={{
@@ -197,38 +303,19 @@ export default function ContributionGraph() {
                 fontSize: 13,
               }}
             >
-              <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-              </svg>
               集計中...
             </div>
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 16 }}>
+            <LineChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 40 }}>
               <CartesianGrid strokeDasharray="1 3" stroke="#30363d" />
               <XAxis
-                dataKey={period === "1m" ? "dayLabel" : "label"}
-                tick={{ fill: "#8b949e", fontSize: 11 }}
+                dataKey="date"
+                tick={<CustomXAxisTick data={data} period={period} />}
                 tickLine={false}
                 axisLine={false}
                 interval={period === "1y" ? tickInterval : 0}
-                dy={5}
-                label={{
-                  value: "Days",
-                  position: "insideBottom",
-                  offset: -6,
-                  fill: "#8b949e",
-                  fontSize: 11,
-                }}
               />
               <YAxis
                 tick={{ fill: "#8b949e", fontSize: 11 }}
