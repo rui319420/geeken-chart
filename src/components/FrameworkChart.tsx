@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
 interface FrameworkData {
@@ -10,13 +10,10 @@ interface FrameworkData {
   memberCount: number;
 }
 
-// ────────────────────────────────────────────────────
-// カテゴリ定義
-// ────────────────────────────────────────────────────
 type Category = "frontend" | "backend" | "fullstack" | "data/ml" | "infra/tool" | "other";
+type SortKey = "popular" | "category" | "name";
 
 const CATEGORY_MAP: Record<string, Category> = {
-  // フロントエンド
   React: "frontend",
   Vue: "frontend",
   Svelte: "frontend",
@@ -49,8 +46,6 @@ const CATEGORY_MAP: Record<string, Category> = {
   "D3.js": "frontend",
   Recharts: "frontend",
   "Chart.js": "frontend",
-
-  // バックエンド
   Express: "backend",
   Fastify: "backend",
   Hono: "backend",
@@ -80,15 +75,11 @@ const CATEGORY_MAP: Record<string, Category> = {
   "Apollo Server": "backend",
   gRPC: "backend",
   Tonic: "backend",
-
-  // フルスタック / メタフレームワーク
   "Next.js": "fullstack",
   Nuxt: "fullstack",
   Remix: "fullstack",
   SvelteKit: "fullstack",
   Gatsby: "fullstack",
-
-  // データ / ML
   NumPy: "data/ml",
   pandas: "data/ml",
   Matplotlib: "data/ml",
@@ -108,8 +99,6 @@ const CATEGORY_MAP: Record<string, Category> = {
   LlamaIndex: "data/ml",
   "llama.cpp": "data/ml",
   "Vercel AI SDK": "data/ml",
-
-  // インフラ / ツール
   Prisma: "infra/tool",
   Drizzle: "infra/tool",
   TypeORM: "infra/tool",
@@ -182,6 +171,15 @@ const CATEGORY_MAP: Record<string, Category> = {
   "async-std": "infra/tool",
 };
 
+const CATEGORY_ORDER: Category[] = [
+  "frontend",
+  "fullstack",
+  "backend",
+  "data/ml",
+  "infra/tool",
+  "other",
+];
+
 const CATEGORY_COLORS: Record<Category, string> = {
   frontend: "#3178c6",
   backend: "#e8614a",
@@ -200,16 +198,23 @@ const CATEGORY_LABELS: Record<Category, string> = {
   other: "その他",
 };
 
+const SORT_LABELS: Record<SortKey, string> = {
+  popular: "人気順",
+  category: "カテゴリー順",
+  name: "名前順",
+};
+
 function getCategory(framework: string): Category {
   return CATEGORY_MAP[framework] ?? "other";
 }
 
-const ALL_CATEGORIES = Object.keys(CATEGORY_LABELS) as Category[];
+const ALL_CATEGORIES = CATEGORY_ORDER;
 
 export default function FrameworkChart() {
   const [data, setData] = useState<FrameworkData[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategories, setActiveCategories] = useState<Set<Category>>(new Set(ALL_CATEGORIES));
+  const [sortKey, setSortKey] = useState<SortKey>("popular");
 
   useEffect(() => {
     fetch("/api/frameworks/all")
@@ -221,7 +226,6 @@ export default function FrameworkChart() {
   const toggleCategory = (cat: Category) => {
     setActiveCategories((prev) => {
       const next = new Set(prev);
-      // 1つしか残っていない状態でオフにするのを防ぐ
       if (next.has(cat) && next.size === 1) return prev;
       if (next.has(cat)) next.delete(cat);
       else next.add(cat);
@@ -229,9 +233,32 @@ export default function FrameworkChart() {
     });
   };
 
-  const filtered = data.filter((d) => activeCategories.has(getCategory(d.framework))).slice(0, 20);
+  const sorted = useMemo(() => {
+    const filtered = data.filter((d) => activeCategories.has(getCategory(d.framework)));
 
-  const chartHeight = Math.max(filtered.length * 36 + 40, 160);
+    switch (sortKey) {
+      case "popular":
+        return [...filtered].sort((a, b) => b.totalRepos - a.totalRepos).slice(0, 20);
+
+      case "category":
+        return [...filtered]
+          .sort((a, b) => {
+            const catA = CATEGORY_ORDER.indexOf(getCategory(a.framework));
+            const catB = CATEGORY_ORDER.indexOf(getCategory(b.framework));
+            if (catA !== catB) return catA - catB;
+            // 同カテゴリ内はリポジトリ数降順
+            return b.totalRepos - a.totalRepos;
+          })
+          .slice(0, 20);
+
+      case "name":
+        return [...filtered]
+          .sort((a, b) => a.framework.localeCompare(b.framework, "ja"))
+          .slice(0, 20);
+    }
+  }, [data, activeCategories, sortKey]);
+
+  const chartHeight = Math.max(sorted.length * 36 + 40, 160);
 
   return (
     <div className="w-full rounded-xl border border-[#21262d] bg-[#0d1117] p-5">
@@ -240,29 +267,53 @@ export default function FrameworkChart() {
         各メンバーのリポジトリの依存ファイルから集計（リポジトリ数）
       </p>
 
-      {/* カテゴリフィルター */}
-      <div className="mb-5 flex flex-wrap gap-2">
-        {ALL_CATEGORIES.map((cat) => {
-          const active = activeCategories.has(cat);
-          return (
-            <button
-              key={cat}
-              onClick={() => toggleCategory(cat)}
-              className="flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-all duration-150"
-              style={{
-                borderColor: active ? CATEGORY_COLORS[cat] : "#30363d",
-                background: active ? `${CATEGORY_COLORS[cat]}22` : "transparent",
-                color: active ? CATEGORY_COLORS[cat] : "#636e7b",
-              }}
-            >
-              <span
-                className="inline-block h-2 w-2 rounded-full"
-                style={{ background: active ? CATEGORY_COLORS[cat] : "#636e7b" }}
-              />
-              {CATEGORY_LABELS[cat]}
-            </button>
-          );
-        })}
+      {/* ソート + カテゴリフィルター */}
+      <div className="mb-5 flex flex-col gap-3">
+        {/* ソートボタン */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-[#636e7b]">並び替え</span>
+          <div className="flex rounded-lg bg-[#161b22] p-1">
+            {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
+              <button
+                key={key}
+                onClick={() => setSortKey(key)}
+                className="rounded-md px-3 py-1 text-xs font-medium transition-all duration-150"
+                style={{
+                  background: sortKey === key ? "#21262d" : "transparent",
+                  color: sortKey === key ? "#e6edf3" : "#636e7b",
+                }}
+              >
+                {SORT_LABELS[key]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* カテゴリフィルター */}
+        <div className="flex flex-wrap gap-2">
+          <span className="text-xs text-[#636e7b]">絞り込み</span>
+          {ALL_CATEGORIES.map((cat) => {
+            const active = activeCategories.has(cat);
+            return (
+              <button
+                key={cat}
+                onClick={() => toggleCategory(cat)}
+                className="flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-all duration-150"
+                style={{
+                  borderColor: active ? CATEGORY_COLORS[cat] : "#30363d",
+                  background: active ? `${CATEGORY_COLORS[cat]}22` : "transparent",
+                  color: active ? CATEGORY_COLORS[cat] : "#636e7b",
+                }}
+              >
+                <span
+                  className="inline-block h-2 w-2 rounded-full"
+                  style={{ background: active ? CATEGORY_COLORS[cat] : "#636e7b" }}
+                />
+                {CATEGORY_LABELS[cat]}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {loading ? (
@@ -280,7 +331,7 @@ export default function FrameworkChart() {
           </svg>
           集計中...
         </div>
-      ) : filtered.length === 0 ? (
+      ) : sorted.length === 0 ? (
         <div className="flex h-48 items-center justify-center text-[#636e7b]">
           {data.length === 0
             ? "データがありません。「今すぐ更新」を実行してください。"
@@ -289,7 +340,7 @@ export default function FrameworkChart() {
       ) : (
         <ResponsiveContainer width="100%" height={chartHeight}>
           <BarChart
-            data={filtered}
+            data={sorted}
             layout="vertical"
             margin={{ top: 0, right: 48, left: 100, bottom: 0 }}
           >
@@ -338,10 +389,13 @@ export default function FrameworkChart() {
               }}
             />
             <Bar dataKey="totalRepos" radius={[0, 4, 4, 0]}>
-              {filtered.map((entry, index) => {
-                const cat = getCategory(entry.framework);
-                return <Cell key={`cell-${index}`} fill={CATEGORY_COLORS[cat]} opacity={0.85} />;
-              })}
+              {sorted.map((entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={CATEGORY_COLORS[getCategory(entry.framework)]}
+                  opacity={0.85}
+                />
+              ))}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
