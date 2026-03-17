@@ -37,9 +37,9 @@ interface CustomXAxisTickProps {
 }
 
 interface TopUser {
-  githubName: string;
   count: number;
-  isAnonymous: boolean;
+  displayName: string;
+  avatarUrl: string | null;
 }
 
 interface ApiDay {
@@ -59,7 +59,7 @@ interface DayData {
 
 //「匿」アイコン＆GitHubアイコンを表示する共通コンポーネント
 const TopUserAvatar = ({ topUser, size = 20 }: { topUser: TopUser; size?: number }) => {
-  if (topUser.isAnonymous) {
+  if (!topUser.avatarUrl) {
     return (
       <div
         style={{
@@ -82,14 +82,9 @@ const TopUserAvatar = ({ topUser, size = 20 }: { topUser: TopUser; size?: number
   }
   return (
     <img
-      src={`https://github.com/${topUser.githubName}.png`}
-      alt={topUser.githubName}
-      style={{
-        width: size,
-        height: size,
-        borderRadius: "50%",
-        border: "1px solid #484f58",
-      }}
+      src={topUser.avatarUrl}
+      alt={topUser.displayName}
+      style={{ width: size, height: size, borderRadius: "50%", border: "1px solid #484f58" }}
     />
   );
 };
@@ -209,9 +204,7 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
           }}
         >
           <TopUserAvatar topUser={data.topUser} size={16} />
-          <span style={{ color: "#c9d1d9", fontSize: 11 }}>
-            {data.topUser.isAnonymous ? "匿名ユーザー" : data.topUser.githubName} が1位!
-          </span>
+          <span style={{ color: "#c9d1d9", fontSize: 11 }}>{data.topUser.displayName} が1位!</span>
         </div>
       )}
     </div>

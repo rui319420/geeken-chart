@@ -91,7 +91,8 @@ export async function GET(request: Request) {
     // 最終的なデータ整形
     const formattedData = entries.map((entry) => {
       let level: 0 | 1 | 2 | 3 | 4 = 0;
-      if (entry.totalCount > 0) {
+      // ★ maxCount > 0 を追加して 0除算を完全に防ぐ
+      if (entry.totalCount > 0 && maxCount > 0) {
         if (maxCount <= 4) {
           level = Math.min(entry.totalCount, 4) as 1 | 2 | 3 | 4;
         } else {
@@ -103,11 +104,14 @@ export async function GET(request: Request) {
         }
       }
 
+      // ★ シニアの提案通り、表示用のデータだけを返す（ロジックをバックエンドに寄せる）
       const safeTopUser = entry.topUser
         ? {
             count: entry.topUser.count,
-            isAnonymous: entry.topUser.isAnonymous,
-            githubName: entry.topUser.isAnonymous ? "anonymous" : entry.topUser.githubName,
+            displayName: entry.topUser.isAnonymous ? "匿名ユーザー" : entry.topUser.githubName,
+            avatarUrl: entry.topUser.isAnonymous
+              ? null
+              : `https://github.com/${entry.topUser.githubName}.png`,
           }
         : null;
 
