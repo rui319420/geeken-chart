@@ -24,7 +24,7 @@ export async function GET() {
       totalRepos: r._sum.repoCount ?? 0,
       memberCount: r._count.userId,
     }))
-    .sort((a, b) => b.memberCount - a.memberCount)
+    .sort((a, b) => b.totalRepos - a.totalRepos)
     .slice(0, 20);
 
   await redis.set(CACHE_KEY, result, { ex: TTL });
