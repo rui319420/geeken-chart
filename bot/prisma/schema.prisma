@@ -128,11 +128,12 @@ model VerificationToken {
 model RawDiscordActivity {
   id            String   @id @default(cuid())
   discordId     String
+  weekKey       String   @default("")
   dayOfWeek     Int
   hour          Int
   messageCount  Int      @default(0)
   presenceCount Int      @default(0)
   updatedAt     DateTime @updatedAt
 
-  @@unique([discordId, dayOfWeek, hour])
+  @@unique([discordId, weekKey, dayOfWeek, hour])
 }

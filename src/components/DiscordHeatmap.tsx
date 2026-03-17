@@ -5,6 +5,8 @@ import { useEffect, useState, useRef } from "react";
 const DAY_LABELS = ["月", "火", "水", "木", "金", "土", "日"];
 const HOUR_TICKS = [0, 3, 6, 9, 12, 15, 18, 21, 24];
 
+type Week = "current" | "last";
+
 interface HeatmapData {
   matrix: number[][];
   maxVal: number;
@@ -23,58 +25,58 @@ function getCellStyle(value: number): { background: string; boxShadow: string } 
   return { background: "rgba(130, 180, 255, 1.0)", boxShadow: "0 0 16px rgba(130,180,255,0.6)" };
 }
 
-function getBestSlots(matrix: number[][], maxVal: number) {
-  const slots: { day: number; hour: number; score: number }[] = [];
-  for (let d = 0; d < 7; d++)
-    for (let h = 0; h < 24; h++)
-      if (matrix[d][h] > 0) slots.push({ day: d, hour: h, score: matrix[d][h] });
-  return slots
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 3)
-    .map((s) => ({ ...s, pct: Math.round((s.score / maxVal) * 100) }));
-}
-
 function makeDummyData(): HeatmapData {
   const matrix = Array.from({ length: 7 }, () => new Array(24).fill(0));
   return { matrix, maxVal: 1, normalized: matrix };
 }
 
 export default function DiscordHeatmap() {
-  const [data, setData] = useState<HeatmapData | null>(null);
+  const [week, setWeek] = useState<Week>("current");
+  const [dataMap, setDataMap] = useState<Partial<Record<Week, HeatmapData>>>({});
   const [loading, setLoading] = useState(true);
   const [hovered, setHovered] = useState<{ day: number; hour: number } | null>(null);
   const [visible, setVisible] = useState(false);
-  // 現在の曜日と時間を管理 (0:月曜〜6:日曜に合わせる)
   const [now, setNow] = useState<{ day: number; hour: number }>({
     day: (new Date().getDay() + 6) % 7,
     hour: new Date().getHours(),
   });
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const fetchWeek = (w: Week) => {
+    if (dataMap[w]) return;
+    setLoading(true);
+    const url = w === "last" ? "/api/discord/heatmap?week=last" : "/api/discord/heatmap";
+    fetch(url)
+      .then((r) => r.json())
+      .then((d: HeatmapData) => setDataMap((prev) => ({ ...prev, [w]: d })))
+      .catch((e) => console.error("Discord heatmap fetch failed:", e))
+      .finally(() => setLoading(false));
+  };
+
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 80);
+    fetchWeek("current");
 
-    // 現在時刻の更新タイマー (1分ごとに更新)
     const timer = setInterval(() => {
       const d = new Date();
       setNow({ day: (d.getDay() + 6) % 7, hour: d.getHours() });
     }, 60000);
 
-    fetch("/api/discord/heatmap")
-      .then((r) => r.json())
-      .then((d: HeatmapData) => setData(d))
-      .catch((e) => console.error("Discord heatmap fetch failed:", e))
-      .finally(() => setLoading(false));
-
     return () => {
       clearTimeout(t);
       clearInterval(timer);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const handleWeekChange = (w: Week) => {
+    setWeek(w);
+    fetchWeek(w);
+  };
+
+  const data = dataMap[week];
   const display = data ?? makeDummyData();
-  const bestSlots = data && data.maxVal > 0 ? getBestSlots(data.matrix, data.maxVal) : [];
-  const isEmpty = !loading && (!data || data.maxVal === 0);
+  const isCurrent = week === "current";
 
   return (
     <div
@@ -92,13 +94,52 @@ export default function DiscordHeatmap() {
       }}
     >
       {/* ヘッダー */}
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 14,
+        }}
+      >
         <h3 style={{ color: "#e6edf3", fontWeight: 700, fontSize: 20, margin: 0 }}>
           Discord アクティビティ
         </h3>
+
+        {/* 今週/先週 切り替えボタンのみ復活 */}
+        <div
+          style={{
+            display: "flex",
+            background: "#161b22",
+            border: "1px solid rgba(88,101,242,0.2)",
+            borderRadius: 8,
+            padding: 3,
+            gap: 2,
+          }}
+        >
+          {(["current", "last"] as Week[]).map((w) => (
+            <button
+              key={w}
+              onClick={() => handleWeekChange(w)}
+              style={{
+                padding: "4px 12px",
+                borderRadius: 6,
+                fontSize: 11,
+                fontWeight: 500,
+                border: "none",
+                cursor: "pointer",
+                transition: "all 0.15s",
+                background: week === w ? "rgba(88,101,242,0.25)" : "transparent",
+                color: week === w ? "#a5b4fc" : "#636e7b",
+              }}
+            >
+              {w === "current" ? "今週" : "先週"}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* ヒートマップ */}
+      {/* ヒートマップ本体 */}
       <div>
         <div style={{ display: "grid", gridTemplateColumns: "22px 1fr", marginBottom: 3 }}>
           <div />
@@ -132,8 +173,8 @@ export default function DiscordHeatmap() {
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: 12,
-                color: d >= 5 ? "#7c8cf5" : "#636e7b",
-                fontWeight: d >= 5 ? 700 : 400,
+                color: isCurrent && d === now.day ? "#a5b4fc" : d >= 5 ? "#7c8cf5" : "#636e7b",
+                fontWeight: (isCurrent && d === now.day) || d >= 5 ? 700 : 400,
               }}
             >
               {dayLabel}
@@ -144,7 +185,7 @@ export default function DiscordHeatmap() {
                 const norm = loading ? 0 : display.normalized[d][h];
                 const count = loading ? 0 : display.matrix[d][h];
                 const isHovered = hovered?.day === d && hovered?.hour === h;
-                const isNow = now.day === d && now.hour === h; // 現在時刻判定
+                const isNow = isCurrent && now.day === d && now.hour === h;
                 const cellStyle = getCellStyle(norm);
 
                 return (
@@ -157,13 +198,12 @@ export default function DiscordHeatmap() {
                       aspectRatio: "1 / 1",
                       borderRadius: 3,
                       background: loading ? "rgba(22,27,34,0.5)" : cellStyle.background,
+                      outline: isNow ? "2px solid rgba(255,255,255,0.9)" : "none",
+                      outlineOffset: isNow ? "1px" : "0",
+                      zIndex: isNow ? 1 : 0,
                       boxShadow: isHovered
                         ? "0 0 0 1.5px rgba(88,101,242,0.8), 0 0 8px rgba(88,101,242,0.5)"
                         : cellStyle.boxShadow,
-                      // 現在時刻のセルを白い枠線で強調
-                      outline: isNow ? "2px solid #ffffff" : "none",
-                      outlineOffset: isNow ? "1px" : "0",
-                      zIndex: isNow ? 1 : 0,
                       transition: "box-shadow 0.12s ease",
                       cursor: count > 0 ? "pointer" : "default",
                       animation: loading
@@ -180,7 +220,34 @@ export default function DiscordHeatmap() {
         ))}
       </div>
 
-      {/* 凡例などは省略（元のコードを維持） */}
+      {/* 凡例 */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "flex-end",
+          gap: 4,
+          marginTop: 12,
+        }}
+      >
+        <span style={{ fontSize: 10, color: "#484f58" }}>少</span>
+        {[0, 0.15, 0.35, 0.55, 0.75, 1.0].map((v, i) => {
+          const s = getCellStyle(v);
+          return (
+            <div
+              key={i}
+              style={{
+                width: 11,
+                height: 11,
+                borderRadius: 2,
+                background: s.background,
+                border: "1px solid rgba(255,255,255,0.04)",
+              }}
+            />
+          );
+        })}
+        <span style={{ fontSize: 10, color: "#484f58" }}>多</span>
+      </div>
 
       <style>{`
         @keyframes pulse {
@@ -188,8 +255,8 @@ export default function DiscordHeatmap() {
           50%       { opacity: 0.7; }
         }
         @keyframes pulse-now {
-          0%, 100% { outline-color: rgba(255, 255, 255, 1); }
-          50%       { outline-color: rgba(255, 255, 255, 0.4); }
+          0%, 100% { outline-color: rgba(255,255,255,0.9); }
+          50%       { outline-color: rgba(255,255,255,0.3); }
         }
       `}</style>
     </div>
