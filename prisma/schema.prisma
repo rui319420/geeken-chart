@@ -3,7 +3,6 @@
 
 generator client {
   provider        = "prisma-client-js"
-  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
@@ -49,7 +48,7 @@ model User {
   totalPRs        Int?
   totalIssues     Int?
   statsUpdatedAt  DateTime?
-	
+
   @@index([joinRanking, githubScore(sort: Desc)])
 }
 
