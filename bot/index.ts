@@ -205,9 +205,6 @@ async function pollOnlineMembers(): Promise<void> {
   try {
     const guild = await client.guilds.fetch(GUILD_ID);
 
-    // presenceキャッシュを最新に更新
-    await guild.members.fetch();
-
     const onlineMembers = guild.members.cache.filter(
       (m) =>
         !m.user.bot &&
@@ -222,28 +219,31 @@ async function pollOnlineMembers(): Promise<void> {
       return;
     }
 
-    const { dayOfWeek, hour } = toJstActivity(new Date());
+    const now = new Date();
+    const { dayOfWeek, hour } = toJstActivity(now);
+    const weekKey = getWeekKey(now);
 
     // オンラインだった各メンバーの presenceCount を +1
     await Promise.all(
       onlineMembers.map((member) =>
         prisma.rawDiscordActivity.upsert({
           where: {
-            discordId_dayOfWeek_hour: {
+            discordId_weekKey_dayOfWeek_hour: {
               discordId: member.id,
+              weekKey,
               dayOfWeek,
               hour,
             },
           },
           update: { presenceCount: { increment: 1 } },
-          create: { discordId: member.id, dayOfWeek, hour, presenceCount: 1 },
+          create: { discordId: member.id, weekKey, dayOfWeek, hour, presenceCount: 1 },
         }),
       ),
     );
 
     console.log(
       `[Bot] ポーリング完了: ${onlineCount}人オンライン` +
-        ` (${DAY_LABELS[dayOfWeek]} ${hour}時台)`,
+        ` (${DAY_LABELS[dayOfWeek]} ${hour}時台, ${weekKey})`,
     );
   } catch (err) {
     console.error("[Bot] ポーリング失敗:", err);
