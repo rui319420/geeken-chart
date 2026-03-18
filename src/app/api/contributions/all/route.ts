@@ -11,7 +11,7 @@ export async function GET(request: Request) {
 
     const users = await prisma.user.findMany({
       where: { showCommits: true },
-      select: { githubName: true, isAnonymous: true },
+      select: { githubName: true, isAnonymous: true, nickname: true },
     });
 
     const GITHUB_TOKEN = process.env.GITHUB_ACCESS_TOKEN;
@@ -24,6 +24,7 @@ export async function GET(request: Request) {
       totalCount: number;
       topUser: {
         githubName: string;
+        nickname: string | null;
         count: number;
         isAnonymous: boolean;
       } | null;
@@ -70,6 +71,7 @@ export async function GET(request: Request) {
             if (day.contributionCount > currentTopCount && day.contributionCount > 0) {
               dailyStats[day.date].topUser = {
                 githubName: user.githubName,
+                nickname: user.nickname,
                 count: day.contributionCount,
                 isAnonymous: user.isAnonymous,
               };
@@ -91,7 +93,6 @@ export async function GET(request: Request) {
     // 最終的なデータ整形
     const formattedData = entries.map((entry) => {
       let level: 0 | 1 | 2 | 3 | 4 = 0;
-      // ★ maxCount > 0 を追加して 0除算を完全に防ぐ
       if (entry.totalCount > 0 && maxCount > 0) {
         if (maxCount <= 4) {
           level = Math.min(entry.totalCount, 4) as 1 | 2 | 3 | 4;
@@ -104,11 +105,12 @@ export async function GET(request: Request) {
         }
       }
 
-      // ★ シニアの提案通り、表示用のデータだけを返す（ロジックをバックエンドに寄せる）
       const safeTopUser = entry.topUser
         ? {
             count: entry.topUser.count,
-            displayName: entry.topUser.isAnonymous ? "匿名ユーザー" : entry.topUser.githubName,
+            displayName: entry.topUser.isAnonymous
+              ? "匿名ユーザー"
+              : entry.topUser.nickname || entry.topUser.githubName,
             avatarUrl: entry.topUser.isAnonymous
               ? null
               : `https://github.com/${entry.topUser.githubName}.png`,
