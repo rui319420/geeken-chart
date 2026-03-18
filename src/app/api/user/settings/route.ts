@@ -81,6 +81,8 @@ export async function PATCH(request: Request) {
     await redis.del("languages:all:aggregated:average");
     await redis.del("languages:all:aggregated:total:v2");
     await redis.del("languages:all:aggregated:average:v2");
+    await redis.del("languages:all:aggregated:total:v3");
+    await redis.del("languages:all:aggregated:average:v3");
 
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
