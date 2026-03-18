@@ -276,22 +276,14 @@ export async function POST(request: Request) {
           result.error = appendError(result.error, `stats: ${errorMsg(e)}`);
         }
 
-        // ──────────────────────────────────────────────────────────
-        // 5. フレームワーク依存情報を取得して保存
-        //    cachedRepos を渡すことでリポジトリ一覧の再取得を防ぐ
-        //    各ファイル取得は github-deps.ts 内で Redis キャッシュ済み
-        // ──────────────────────────────────────────────────────────
+        // ── 5. フレームワーク依存情報を取得して保存 ──
         try {
-          const frameworkStats = await getUserFrameworkStats(
-            githubName,
-            token,
-            5,
-            repos, // キャッシュ済みリポジトリを渡す
-          );
+          const frameworkStats = await getUserFrameworkStats(githubName, token, 5, repos);
 
-          await prisma.frameworkUsage.deleteMany({ where: { userId: user.id } });
-
+          // ↓ frameworkStats が空でも delete が走っていたのが原因
+          // 取得成功かつ1件以上あるときだけ delete → insert
           if (frameworkStats.length > 0) {
+            await prisma.frameworkUsage.deleteMany({ where: { userId: user.id } });
             await prisma.frameworkUsage.createMany({
               data: frameworkStats.map((f) => ({
                 userId: user.id,
@@ -307,7 +299,6 @@ export async function POST(request: Request) {
           console.error(`Framework fetch failed for ${githubName}:`, e);
           result.error = appendError(result.error, `frameworks: ${errorMsg(e)}`);
         }
-
         results.push(result);
       }),
     ),
