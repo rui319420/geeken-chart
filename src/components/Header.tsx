@@ -2,18 +2,26 @@
 
 import { signIn, signOut, useSession } from "next-auth/react";
 import Image from "next/image";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 export default function Header() {
   const { data: session, status } = useSession();
+  const pathname = usePathname();
+
+  // 現在のページが設定画面かどうかを判定
+  const isSettingsPage = pathname === "/settings";
 
   return (
     <header className="w-full border-b border-white/5 bg-[#0d1117]">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 md:px-6">
-        {/* ロゴ */}
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#2ea043]">技</div>
+        {/* 左側：ロゴ（クリックでトップページへ） */}
+        <Link href="/" className="flex items-center gap-2.5 transition-opacity hover:opacity-80">
+          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#2ea043] font-bold text-white">
+            技
+          </div>
           <span className="text-sm font-bold tracking-widest text-[#F2F3F5]">技研チャート</span>
-        </div>
+        </Link>
 
         {/* 右側 */}
         <div className="flex items-center gap-3">
@@ -36,9 +44,55 @@ export default function Header() {
                   {session.user?.nickname || session.user?.name}
                 </span>
               </div>
+
+              {/* 設定ボタン or ホームへ戻るボタン */}
+              {!isSettingsPage ? (
+                <Link
+                  href="/settings"
+                  className="flex items-center gap-1.5 rounded-md border border-white/10 bg-[#21262d] px-3 py-1.5 text-xs text-[#c9d1d9] transition-all duration-200 hover:border-white/20 hover:bg-[#30363d] hover:text-[#F2F3F5]"
+                  aria-label="設定画面へ"
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                  </svg>
+                  設定
+                </Link>
+              ) : (
+                <Link
+                  href="/"
+                  className="flex items-center gap-1.5 rounded-md border border-white/10 bg-[#21262d] px-3 py-1.5 text-xs text-[#c9d1d9] transition-all duration-200 hover:border-white/20 hover:bg-[#30363d] hover:text-[#F2F3F5]"
+                  aria-label="ダッシュボードへ戻る"
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                  </svg>
+                  戻る
+                </Link>
+              )}
+
               {/* ログアウト */}
               <button
-                onClick={() => signOut()}
+                onClick={() => signOut({ callbackUrl: "/" })}
                 className="rounded-md border border-white/10 px-3 py-1.5 text-xs text-[#949BA4] transition-all duration-200 hover:border-white/20 hover:text-[#F2F3F5]"
               >
                 ログアウト
