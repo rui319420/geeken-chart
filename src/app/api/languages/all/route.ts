@@ -14,69 +14,64 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const mode = searchParams.get("mode") === "average" ? "average" : "total";
 
-    const CACHE_KEY = `languages:all:aggregated:${mode}:v3`;
+    const CACHE_KEY = `languages:all:aggregated:${mode}:v5`;
+
     const cached =
       await redis.get<{ name: string; bytes?: number; percentage: number }[]>(CACHE_KEY);
     if (cached) return NextResponse.json(cached);
 
-    const users = await prisma.user.findMany({
-      where: { showLanguages: true },
-      select: {
-        excludedLanguages: true,
-        languages: {
-          select: { language: true, bytes: true },
-        },
-      },
-    });
+    let result;
 
-    const scoreMap: Record<string, number> = {};
-    let validUserCount = 0;
-    let totalBytesGlobal = 0;
+    if (mode === "average") {
+      const allLanguages = await prisma.userLanguage.findMany({
+        where: { user: { showLanguages: true } },
+      });
+      const userLangMap: Record<string, { language: string; bytes: number }[]> = {};
+      for (const lang of allLanguages) {
+        if (!userLangMap[lang.userId]) userLangMap[lang.userId] = [];
+        userLangMap[lang.userId].push({ language: lang.language, bytes: lang.bytes });
+      }
 
-    // 集計の過程で、各個人の除外設定を適用しながら足し算していく
-    for (const user of users) {
-      const excluded = user.excludedLanguages || [];
-      // このユーザー本人が除外設定している言語は、この時点で引っこ抜く
-      const validLangs = user.languages.filter((l) => !excluded.includes(l.language));
+      const scoreMap: Record<string, number> = {};
+      let validUserCount = 0;
 
-      if (validLangs.length === 0) continue;
-
-      if (mode === "average") {
-        const userTotalBytes = validLangs.reduce((sum, l) => sum + l.bytes, 0);
+      for (const userId in userLangMap) {
+        const userLangs = userLangMap[userId];
+        const userTotalBytes = userLangs.reduce((sum, l) => sum + l.bytes, 0);
         if (userTotalBytes === 0) continue;
 
         validUserCount++;
-        for (const lang of validLangs) {
+        for (const lang of userLangs) {
           const percentage = lang.bytes / userTotalBytes;
           scoreMap[lang.language] = (scoreMap[lang.language] || 0) + percentage;
         }
-      } else {
-        // mode === "total"
-        for (const lang of validLangs) {
-          scoreMap[lang.language] = (scoreMap[lang.language] || 0) + lang.bytes;
-          totalBytesGlobal += lang.bytes;
-        }
       }
-    }
 
-    let result;
-    if (mode === "average") {
       result = Object.entries(scoreMap)
         .map(([name, score]) => ({
           name,
           percentage: calculatePercentage(score, validUserCount),
         }))
-        .sort((a, b) => b.percentage - a.percentage)
-        .slice(0, 12);
+        .sort((a, b) => b.percentage - a.percentage);
     } else {
-      result = Object.entries(scoreMap)
-        .map(([name, bytes]) => ({
-          name,
-          bytes,
-          percentage: calculatePercentage(bytes, totalBytesGlobal),
-        }))
-        .sort((a, b) => b.bytes - a.bytes)
-        .slice(0, 12);
+      const groupedLanguages = await prisma.userLanguage.groupBy({
+        by: ["language"],
+        where: { user: { showLanguages: true } },
+        _sum: { bytes: true },
+      });
+
+      const totalBytes = groupedLanguages.reduce((sum, lang) => sum + (lang._sum.bytes ?? 0), 0);
+
+      result = groupedLanguages
+        .map((lang) => {
+          const bytes = lang._sum.bytes ?? 0;
+          return {
+            name: lang.language,
+            bytes: bytes,
+            percentage: calculatePercentage(bytes, totalBytes),
+          };
+        })
+        .sort((a, b) => b.bytes - a.bytes);
     }
 
     await redis.set(CACHE_KEY, result, { ex: TTL });

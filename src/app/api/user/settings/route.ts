@@ -76,20 +76,16 @@ export async function PATCH(request: Request) {
     select: userSettingsSelect,
   });
 
-  if ("includePrivate" in data || "showLanguages" in data || "excludedLanguages" in data) {
-    await redis.del("languages:all:aggregated:total");
-    await redis.del("languages:all:aggregated:average");
-    await redis.del("languages:all:aggregated:total:v2");
-    await redis.del("languages:all:aggregated:average:v2");
-    await redis.del("languages:all:aggregated:total:v3");
-    await redis.del("languages:all:aggregated:average:v3");
+  // プライベートや言語公開設定が変わった時のみ、個人の言語データをリセットする
+  if ("includePrivate" in data || "showLanguages" in data) {
+    await redis.del("languages:all:aggregated:total:v5");
+    await redis.del("languages:all:aggregated:average:v5");
 
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: { githubName: true },
     });
-    // includePrivateやshowLanguagesが変わった時は個人の言語データもリセットする
-    if (user && ("includePrivate" in data || "showLanguages" in data)) {
+    if (user) {
       await prisma.userLanguage.deleteMany({ where: { userId: session.user.id } });
     }
   }
