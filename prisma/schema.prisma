@@ -11,46 +11,50 @@ datasource db {
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
+
 // ──────────────────────────────────────
 // ユーザー情報
 // ──────────────────────────────────────
 model User {
-  id           String   @id @default(cuid())
-	name         String?
-  githubId     String   @unique
-  githubName   String
-  nickname     String?
-  avatarUrl    String?
-	email         String?  @unique
-	emailVerified DateTime?
-	image         String?
-	accounts      Account[]
-	sessions      Session[]
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String    @id @default(cuid())
+  name          String?
+  githubId      String    @unique
+  githubName    String
+  nickname      String?
+  avatarUrl     String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   // プライバシー設定
-  showCommits   Boolean @default(true)
-  showLanguages Boolean @default(true)
-  joinRanking   Boolean @default(true)
-  isAnonymous   Boolean @default(false)
-	includePrivate Boolean @default(false)
+  showCommits    Boolean @default(true)
+  showLanguages  Boolean @default(true)
+  joinRanking    Boolean @default(true)
+  isAnonymous    Boolean @default(false)
+  includePrivate Boolean @default(false)
+
+  // 集計やグラフから除外する言語のリスト
+  excludedLanguages String[] @default([])
 
   // リレーション
   languages       UserLanguage[]
-	snapshots     LanguageSnapshot[]
+  snapshots       LanguageSnapshot[]
   discordActivity DiscordActivity[]
-	discordId String? @unique
+  discordId       String?            @unique
 
   // ランキング用 GitHub Stats データ
-  githubScore     Int?
-  totalCommits    Int?
-  totalStars      Int?
-  totalPRs        Int?
-  totalIssues     Int?
-  statsUpdatedAt  DateTime?
+  githubScore    Int?
+  totalCommits   Int?
+  totalStars     Int?
+  totalPRs       Int?
+  totalIssues    Int?
+  statsUpdatedAt DateTime?
 
-	// フレームワーク
+  // フレームワーク
   frameworks FrameworkUsage[]
 
   @@index([joinRanking, githubScore(sort: Desc)])
@@ -88,8 +92,8 @@ model LanguageSnapshot {
 model DiscordActivity {
   id           String   @id @default(cuid())
   userId       String
-  dayOfWeek    Int      // 0=月, 1=火, ..., 6=日
-  hour         Int      // 0〜23
+  dayOfWeek    Int // 0=月, 1=火, ..., 6=日
+  hour         Int // 0〜23
   messageCount Int      @default(0)
   updatedAt    DateTime @updatedAt
 
@@ -152,12 +156,12 @@ model RawDiscordActivity {
 }
 
 model FrameworkUsage {
-  id          String   @id @default(cuid())
-  userId      String
-  framework   String   // "React", "FastAPI" など
-  ecosystem   String   // "npm", "pip", "cargo" など
-  repoCount   Int      @default(1)
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  userId    String
+  framework String // "React", "FastAPI" など
+  ecosystem String // "npm", "pip", "cargo" など
+  repoCount Int      @default(1)
+  updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
