@@ -7,7 +7,6 @@ import LanguagePieChart from "@/components/LanguagePieChart";
 import ContributionGraph from "@/components/ContributionGraph";
 import LanguageTrendChart from "@/components/LanguageTrendChart";
 import RefreshButton from "@/components/RefreshButton";
-import PrivacySettings from "@/components/PrivacySettings";
 import DiscordHeatmap from "@/components/DiscordHeatmap";
 import RankingBoard from "@/components/RankingBoard";
 import FrameworkChart from "@/components/FrameworkChart";
@@ -133,10 +132,6 @@ export default async function HomePage() {
 
           <section className="mb-6">
             <RankingBoard />
-          </section>
-
-          <section className="mb-6">
-            <PrivacySettings />
           </section>
 
           <section className="mb-6">

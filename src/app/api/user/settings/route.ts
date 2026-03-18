@@ -10,6 +10,7 @@ interface SettingsBody {
   joinRanking?: boolean;
   isAnonymous?: boolean;
   nickname?: string;
+  excludedLanguages?: string[];
 }
 
 const userSettingsSelect = {
@@ -19,6 +20,7 @@ const userSettingsSelect = {
   joinRanking: true,
   isAnonymous: true,
   nickname: true,
+  excludedLanguages: true,
 };
 
 export async function PATCH(request: Request) {
@@ -27,10 +29,10 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body: SettingsBody = await request.json();
-
+  const body = await request.json();
   const data: Partial<SettingsBody> = {};
 
+  // ニックネームの処理
   if (typeof body.nickname === "string") {
     const trimmedNickname = body.nickname.trim();
     if (trimmedNickname.length > 20) {
@@ -42,8 +44,15 @@ export async function PATCH(request: Request) {
     data.nickname = trimmedNickname;
   }
 
+  if (Array.isArray(body.excludedLanguages)) {
+    const isValidArray = body.excludedLanguages.every((item: unknown) => typeof item === "string");
+    if (isValidArray) {
+      data.excludedLanguages = body.excludedLanguages as string[];
+    }
+  }
+
   // booleanのフィールドだけを配列にまとめる
-  const booleanFields: (keyof Omit<SettingsBody, "nickname">)[] = [
+  const booleanFields: (keyof Omit<SettingsBody, "nickname" | "excludedLanguages">)[] = [
     "includePrivate",
     "showCommits",
     "showLanguages",
@@ -56,6 +65,7 @@ export async function PATCH(request: Request) {
       data[key] = body[key];
     }
   }
+
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "No valid fields provided" }, { status: 400 });
   }
@@ -66,10 +76,10 @@ export async function PATCH(request: Request) {
     select: userSettingsSelect,
   });
 
-  // 言語関連の設定が変わったら、言語グラフのキャッシュと個人の言語データを消す
+  // プライベートや言語公開設定が変わった時のみ、個人の言語データをリセットする
   if ("includePrivate" in data || "showLanguages" in data) {
-    await redis.del("languages:all:aggregated:total");
-    await redis.del("languages:all:aggregated:average");
+    await redis.del("languages:all:aggregated:total:v5");
+    await redis.del("languages:all:aggregated:average:v5");
 
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
@@ -80,7 +90,6 @@ export async function PATCH(request: Request) {
     }
   }
 
-  // 言語設定またはコミット設定が変わったら、ダッシュボードの全体キャッシュを消す
   if ("includePrivate" in data || "showLanguages" in data || "showCommits" in data) {
     await redis.del("stats:dashboard");
   }
