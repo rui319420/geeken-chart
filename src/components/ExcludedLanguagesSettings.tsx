@@ -122,9 +122,8 @@ export default function ExcludedLanguagesSettings() {
         )}
       </div>
 
-      <p className="mb-6 text-xs text-[#8b949e]">
-        ここでスイッチをOFF（グレー）にした言語は、トップページの円グラフや推移グラフ、ランキングの計算から除外されます。
-        設定を保存した後、トップページの「最新データを取得」ボタンを押すと反映されます。
+      <p className="mt-1 text-xs text-[#949BA4]">
+        ※この設定は今後のアップデートで追加される「マイページ（個人統計）」に反映されます。サークル全体の集計グラフには影響しません。
       </p>
 
       {loading ? (

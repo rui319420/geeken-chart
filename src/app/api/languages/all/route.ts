@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const mode = searchParams.get("mode") === "average" ? "average" : "total";
 
-    const CACHE_KEY = `languages:all:aggregated:${mode}:v5`;
+    const CACHE_KEY = `languages:all:aggregated:${mode}:v7`;
 
     const cached =
       await redis.get<{ name: string; bytes?: number; percentage: number }[]>(CACHE_KEY);
@@ -23,25 +23,24 @@ export async function GET(request: Request) {
     let result;
 
     if (mode === "average") {
-      const allLanguages = await prisma.userLanguage.findMany({
-        where: { user: { showLanguages: true } },
+      const validUsersQuery = await prisma.user.findMany({
+        where: { showLanguages: true },
+        select: {
+          id: true,
+          languages: { select: { language: true, bytes: true } },
+        },
       });
-      const userLangMap: Record<string, { language: string; bytes: number }[]> = {};
-      for (const lang of allLanguages) {
-        if (!userLangMap[lang.userId]) userLangMap[lang.userId] = [];
-        userLangMap[lang.userId].push({ language: lang.language, bytes: lang.bytes });
-      }
 
       const scoreMap: Record<string, number> = {};
       let validUserCount = 0;
 
-      for (const userId in userLangMap) {
-        const userLangs = userLangMap[userId];
-        const userTotalBytes = userLangs.reduce((sum, l) => sum + l.bytes, 0);
+      for (const user of validUsersQuery) {
+        if (user.languages.length === 0) continue;
+        const userTotalBytes = user.languages.reduce((sum, l) => sum + l.bytes, 0);
         if (userTotalBytes === 0) continue;
 
         validUserCount++;
-        for (const lang of userLangs) {
+        for (const lang of user.languages) {
           const percentage = lang.bytes / userTotalBytes;
           scoreMap[lang.language] = (scoreMap[lang.language] || 0) + percentage;
         }
@@ -52,7 +51,8 @@ export async function GET(request: Request) {
           name,
           percentage: calculatePercentage(score, validUserCount),
         }))
-        .sort((a, b) => b.percentage - a.percentage);
+        .sort((a, b) => b.percentage - a.percentage)
+        .slice(0, 12);
     } else {
       const groupedLanguages = await prisma.userLanguage.groupBy({
         by: ["language"],
@@ -71,7 +71,8 @@ export async function GET(request: Request) {
             percentage: calculatePercentage(bytes, totalBytes),
           };
         })
-        .sort((a, b) => b.bytes - a.bytes);
+        .sort((a, b) => b.bytes - a.bytes)
+        .slice(0, 12);
     }
 
     await redis.set(CACHE_KEY, result, { ex: TTL });

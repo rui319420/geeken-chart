@@ -97,8 +97,12 @@ export default function LanguagePieChart() {
   const [data, setData] = useState<LangData[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [includePrivate, setIncludePrivate] = useState<boolean | null>(null);
   const [mode, setMode] = useState<AggregationMode>("total");
+
+  const [settings, setSettings] = useState<{
+    includePrivate: boolean;
+    excludedLanguages: string[];
+  } | null>(null);
 
   const dataLengthRef = useRef(0);
   const activeIndexRef = useRef(0);
@@ -141,88 +145,36 @@ export default function LanguagePieChart() {
     [activeIndex],
   );
 
-  // 設定取得
+  // 設定取得（includePrivate と excludedLanguages を両方とる）
   useEffect(() => {
     fetch("/api/user/settings", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((s: { includePrivate?: boolean } | null) =>
-        setIncludePrivate(s?.includePrivate ?? false),
+      .then((s) =>
+        setSettings({
+          includePrivate: s?.includePrivate ?? false,
+          excludedLanguages: s?.excludedLanguages ?? [],
+        }),
       );
   }, []);
 
-  // データ取得（modeの変更も監視する）
+  // データ取得
   useEffect(() => {
-    if (includePrivate === null) return; // 設定取得待ち
+    if (!settings) return; // 設定取得待ち
 
     const fetchData = async () => {
       setLoading(true);
       try {
         const params = new URLSearchParams();
-        if (includePrivate) params.set("includePrivate", "true");
+        if (settings.includePrivate) params.set("includePrivate", "true");
         params.set("mode", mode);
-        params.set("t", Date.now().toString()); // キャッシュバスター
 
-        // ★ 並列で「全体の言語」「自分の言語」「自分の設定」の3つを一気に取得（爆速）
-        const [allRes, meRes, settingsRes] = await Promise.all([
-          fetch(`/api/languages/all?${params.toString()}`),
-          fetch(`/api/languages/me`),
-          fetch(`/api/user/settings`),
-        ]);
+        params.set("t", Date.now().toString());
 
-        const allLangs = await allRes.json();
-        const myLangs = meRes.ok ? await meRes.json() : [];
-        const settings = settingsRes.ok ? await settingsRes.json() : {};
-        const excludedLanguages = settings.excludedLanguages || [];
-
-        // ★ ブラウザ側での引き算ロジック
-        let processedData = allLangs.map((lang: LangData) => {
-          if (excludedLanguages.includes(lang.name)) {
-            // 除外リストに入っている言語なら、自分の使用分を探す
-            const myLang = myLangs.find((m: LangData) => m.name === lang.name);
-            if (myLang) {
-              if (mode === "total") {
-                // 合計モード：全体のバイト数から自分のバイト数を引く（マイナスにはしない）
-                return { ...lang, bytes: Math.max(0, (lang.bytes || 0) - (myLang.bytes || 0)) };
-              } else {
-                // 平均モード：厳密な引き算が難しいため、全体の割合から自分の割合分を差し引く疑似計算
-                return {
-                  ...lang,
-                  percentage: Math.max(0, lang.percentage - myLang.percentage / 10),
-                };
-              }
-            }
-          }
-          return lang;
-        });
-
-        // 自分の分を引いた結果、0KBになった言語は配列から消し去る
-        processedData = processedData.filter((lang: LangData) =>
-          mode === "total" ? (lang.bytes || 0) > 0 : lang.percentage > 0,
-        );
-
-        // ★ パーセンテージの再計算
-        const newTotal = processedData.reduce(
-          (sum: number, l: LangData) => sum + (mode === "total" ? l.bytes || 0 : l.percentage),
-          0,
-        );
-
-        processedData = processedData.map((l: LangData) => ({
-          ...l,
-          percentage:
-            newTotal > 0
-              ? mode === "total"
-                ? (l.bytes || 0) / newTotal
-                : l.percentage / newTotal
-              : 0,
-        }));
-
-        // ★ 最後に、多い順に並び替えて上位12件でぶった斬る（ここでようやくグラフ用のデータが完成！）
-        const finalData = processedData
-          .sort((a: LangData, b: LangData) => b.percentage - a.percentage)
-          .slice(0, 12);
+        const res = await fetch(`/api/languages/all?${params.toString()}`);
+        const finalData = await res.json();
 
         setData(finalData);
-        dataLengthRef.current = finalData.length;
+        dataLengthRef.current = finalData?.length || 0;
         activeIndexRef.current = 0;
         setActiveIndex(0);
         startLoop(INITIAL_DELAY_MS);
@@ -237,7 +189,7 @@ export default function LanguagePieChart() {
 
     return () => stopLoop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [includePrivate, mode, startLoop]);
+  }, [settings, mode, startLoop]);
 
   return (
     <div className="flex h-112.5 w-full flex-col rounded-xl border border-[#2ea043]/40 bg-linear-to-br from-[#0d1117] to-[#181a26] p-4 shadow-[0_0_20px_rgba(88,101,242,0.15)] md:h-125 md:p-6">
@@ -245,7 +197,7 @@ export default function LanguagePieChart() {
         <div>
           <h2 className="text-xl font-bold tracking-wider text-[#F2F3F5]">言語割合（全体）</h2>
           <p className="mt-0.5 text-xs text-[#636e7b]">
-            {includePrivate
+            {settings?.includePrivate
               ? "公開・プライベート含むコード使用量を集計（GitHub Linguist）"
               : "公開リポジトリのコード使用量を集計（GitHub Linguist）"}
           </p>
