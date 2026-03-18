@@ -240,7 +240,7 @@ async function fetchFileContent(
 
     if (!res.ok) {
       // ファイルなし（404 等）も短めにキャッシュ
-      await redis.set(cacheKey, "", { ex: 60 * 60 * 6 }).catch(() => {});
+      await redis.set(cacheKey, "", { ex: 60 * 60 * 1 }).catch(() => {});
       return null;
     }
 

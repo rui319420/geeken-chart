@@ -263,9 +263,6 @@ export default function FrameworkChart() {
   return (
     <div className="w-full rounded-xl border border-[#2ea043]/40 bg-gradient-to-br from-[#0d1117] to-[#181a26] p-5 shadow-[0_0_24px_rgba(46,160,67,0.15)]">
       <h3 className="mb-1 text-base font-bold text-[#e6edf3]">使用フレームワーク（全体）</h3>
-      <p className="mb-4 text-xs text-[#8b949e]">
-        各メンバーのリポジトリの依存ファイルから集計（リポジトリ数）
-      </p>
 
       {/* ソート + カテゴリフィルター */}
       <div className="mb-5 flex flex-col gap-3">
