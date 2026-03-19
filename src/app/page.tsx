@@ -8,36 +8,10 @@ import ContributionGraph from "@/components/ContributionGraph";
 import LanguageTrendChart from "@/components/LanguageTrendChart";
 import RefreshButton from "@/components/RefreshButton";
 import DiscordHeatmap from "@/components/DiscordHeatmap";
-import RankingBoard from "@/components/RankingBoard";
-import FrameworkChart from "@/components/FrameworkChart";
-
-function MemberList() {
-  const members = [{ name: "rui319420", avatar: "https://github.com/rui319420.png" }];
-  return (
-    <div className="flex w-full flex-col rounded-xl border border-white/5 bg-[#161b22] p-6">
-      <h2 className="mb-4 text-sm font-bold tracking-widest text-[#636e7b] uppercase">メンバー</h2>
-      <div className="flex flex-wrap gap-3">
-        {members.map((m) => (
-          <a
-            key={m.name}
-            href={`https://github.com/${m.name}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group flex items-center gap-2 rounded-lg border border-white/5 bg-white/3 px-3 py-2 transition-all duration-200 hover:border-white/10 hover:bg-white/6"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={m.avatar} alt={m.name} width={24} height={24} className="rounded-full" />
-            <span className="text-xs text-[#949BA4] group-hover:text-[#F2F3F5]">{m.name}</span>
-          </a>
-        ))}
-      </div>
-    </div>
-  );
-}
+import RadioNav from "@/components/RadioNav";
 
 const isDev = process.env.NODE_ENV === "development";
 
-// ランディングと共通の背景レイヤー
 function Background() {
   const dots = Array.from({ length: 80 }, (_, i) => ({
     x: (i * 137.508) % 100,
@@ -45,7 +19,6 @@ function Background() {
     r: 0.8 + (i % 4) * 0.5,
     op: 0.04 + (i % 5) * 0.025,
   }));
-
   return (
     <>
       <svg
@@ -92,50 +65,33 @@ function Background() {
 
 export default async function HomePage() {
   const session = await auth();
-
-  if (!session) {
-    return <LandingPage />;
-  }
+  if (!session) return <LandingPage />;
 
   return (
     <div className="relative min-h-screen bg-[#0d1117]">
       <Background />
+      <RadioNav />
 
-      <div className="relative z-10">
+      <div className="relative z-10" style={{ paddingLeft: "56px" }}>
         <Header />
-
-        <main className="mx-auto max-w-7xl px-4 py-8 md:px-6 md:py-10">
-          <section className="mb-6">
+        <main className="mx-auto max-w-7xl px-4 py-6 md:px-6">
+          <section id="dashboard" className="mb-6">
             <StatsCards />
           </section>
-
           <section className="mb-6">
             <CombinedHeatmap />
           </section>
-
           <section className="mb-6">
             <ContributionGraph />
           </section>
-
-          <section className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <section id="languages" className="mb-6">
             <LanguagePieChart />
-            <MemberList />
           </section>
-
           <section className="mb-6">
             <LanguageTrendChart />
           </section>
-
-          <section className="mb-6">
+          <section id="discord" className="mb-6">
             <DiscordHeatmap />
-          </section>
-
-          <section className="mb-6">
-            <RankingBoard />
-          </section>
-
-          <section className="mb-6">
-            <FrameworkChart />
           </section>
 
           {isDev && (
