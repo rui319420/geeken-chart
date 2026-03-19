@@ -7,9 +7,7 @@ import LanguagePieChart from "@/components/LanguagePieChart";
 import ContributionGraph from "@/components/ContributionGraph";
 import LanguageTrendChart from "@/components/LanguageTrendChart";
 import RefreshButton from "@/components/RefreshButton";
-import PrivacySettings from "@/components/PrivacySettings";
 import DiscordHeatmap from "@/components/DiscordHeatmap";
-import RankingBoard from "@/components/RankingBoard";
 import FrameworkChart from "@/components/FrameworkChart";
 import RadioNav from "@/components/RadioNav";
 
@@ -75,11 +73,8 @@ export default async function HomePage() {
       <Background />
       <RadioNav />
 
-      {/* ヘッダーは sticky、RadioNav 分だけ左をずらす */}
       <div className="relative z-10" style={{ paddingLeft: "56px" }}>
         <Header />
-
-        {/* ヘッダー直下からコンテンツ開始 — padding-top なし */}
         <main className="mx-auto max-w-7xl px-4 py-6 md:px-6">
           <section id="dashboard" className="mb-6">
             <StatsCards />
@@ -98,12 +93,6 @@ export default async function HomePage() {
           </section>
           <section id="discord" className="mb-6">
             <DiscordHeatmap />
-          </section>
-          <section id="ranking" className="mb-6">
-            <RankingBoard />
-          </section>
-          <section id="settings" className="mb-6">
-            <PrivacySettings />
           </section>
           <section className="mb-6">
             <FrameworkChart />
