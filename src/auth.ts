@@ -3,6 +3,7 @@ import GitHub from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import { syncUserLanguages } from "@/services/userService";
+import { waitUntil } from "@vercel/functions";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
@@ -65,8 +66,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         // ユーザー自身のトークンを取得
         const githubName = profile.login as string;
         const userToken = account.access_token;
-
-        syncUserLanguages(userId, githubName, userToken).catch(console.error);
+        waitUntil(syncUserLanguages(userId, githubName, userToken).catch(console.error));
       }
     },
     async signOut(message) {

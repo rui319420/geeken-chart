@@ -1,23 +1,32 @@
 import { prisma } from "@/lib/prisma";
 import { getUserLanguageStats } from "@/lib/github";
 
-// フォールバック用のグローバルトークン（基本はユーザー自身のトークンを使う）
-const FALLBACK_TOKEN = process.env.GITHUB_ACCESS_TOKEN;
-
 export async function syncUserLanguages(userId: string, githubName: string, accessToken?: string) {
-  // ユーザーのトークンを優先し、無ければ環境変数のトークンを使う
-  const token = accessToken || FALLBACK_TOKEN;
-  if (!token || !githubName) return;
+  if (!accessToken || !githubName) {
+    console.warn(`[Sync] トークンまたはGitHub名がないため、${githubName} の同期をスキップします。`);
+    return;
+  }
 
   try {
-    const existingLanguages = await prisma.userLanguage.count({
-      where: { userId: userId },
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    // 24時間以内に更新された自分の言語データが1件でもあれば、最近同期したとみなす
+    const recentSync = await prisma.userLanguage.findFirst({
+      where: {
+        userId: userId,
+        updatedAt: { gte: oneDayAgo },
+      },
     });
 
-    if (existingLanguages > 0) return;
+    if (recentSync) {
+      console.log(`[Sync] ${githubName} の言語データは24時間以内に同期済みのためスキップします。`);
+      return;
+    }
+
+    console.log(`[Sync] ${githubName} の言語データの同期を開始します...`);
 
     const report = await getUserLanguageStats(githubName, {
-      token: token,
+      token: accessToken,
       concurrency: 5,
     });
 
@@ -31,6 +40,8 @@ export async function syncUserLanguages(userId: string, githubName: string, acce
         }),
       ),
     );
+
+    console.log(`[Sync] ${githubName} の言語データの同期が完了しました。`);
   } catch (e) {
     console.error(`[SyncError] Failed to fetch languages for ${githubName}:`, e);
   }
