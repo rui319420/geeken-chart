@@ -8,7 +8,6 @@ import ContributionGraph from "@/components/ContributionGraph";
 import LanguageTrendChart from "@/components/LanguageTrendChart";
 import RefreshButton from "@/components/RefreshButton";
 import DiscordHeatmap from "@/components/DiscordHeatmap";
-import FrameworkChart from "@/components/FrameworkChart";
 import RadioNav from "@/components/RadioNav";
 
 const isDev = process.env.NODE_ENV === "development";
