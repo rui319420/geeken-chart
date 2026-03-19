@@ -34,9 +34,15 @@ export async function syncUserLanguages(userId: string, githubName: string, acce
     await prisma.$transaction(
       statsToSave.map((stat) =>
         prisma.userLanguage.upsert({
-          where: { userId_language: { userId: userId, language: stat.language } },
+          where: {
+            userId_language: { userId: userId, language: stat.language },
+          },
           update: { bytes: stat.bytes },
-          create: { userId: userId, language: stat.language, bytes: stat.bytes },
+          create: {
+            userId: userId,
+            language: stat.language,
+            bytes: stat.bytes,
+          },
         }),
       ),
     );
