@@ -62,8 +62,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           });
         }
 
+        // ユーザー自身のトークンを取得
         const githubName = profile.login as string;
-        await syncUserLanguages(userId, githubName);
+        const userToken = account.access_token;
+
+        syncUserLanguages(userId, githubName, userToken).catch(console.error);
       }
     },
     async signOut(message) {

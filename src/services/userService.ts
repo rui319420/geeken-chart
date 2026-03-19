@@ -1,31 +1,29 @@
 import { prisma } from "@/lib/prisma";
 import { getUserLanguageStats } from "@/lib/github";
 
-const GITHUB_TOKEN = process.env.GITHUB_ACCESS_TOKEN;
+// フォールバック用のグローバルトークン（基本はユーザー自身のトークンを使う）
+const FALLBACK_TOKEN = process.env.GITHUB_ACCESS_TOKEN;
 
-/**
- * 初回ログイン時にGitHubから言語データを取得し、DBに保存する
- */
-export async function syncUserLanguages(userId: string, githubName: string) {
-  if (!GITHUB_TOKEN || !githubName) return;
+export async function syncUserLanguages(userId: string, githubName: string, accessToken?: string) {
+  // ユーザーのトークンを優先し、無ければ環境変数のトークンを使う
+  const token = accessToken || FALLBACK_TOKEN;
+  if (!token || !githubName) return;
 
   try {
-    // すでにデータがある場合はスキップ（初回のみ同期するため）
     const existingLanguages = await prisma.userLanguage.count({
       where: { userId: userId },
     });
 
     if (existingLanguages > 0) return;
 
-    // GitHub APIから統計データを取得
     const report = await getUserLanguageStats(githubName, {
-      token: GITHUB_TOKEN,
+      token: token,
       concurrency: 5,
     });
 
-    // DBに保存（上位20件まで）
-    await Promise.all(
-      report.stats.slice(0, 20).map((stat) =>
+    const statsToSave = report.stats.slice(0, 20);
+    await prisma.$transaction(
+      statsToSave.map((stat) =>
         prisma.userLanguage.upsert({
           where: { userId_language: { userId: userId, language: stat.language } },
           update: { bytes: stat.bytes },
@@ -34,6 +32,6 @@ export async function syncUserLanguages(userId: string, githubName: string) {
       ),
     );
   } catch (e) {
-    console.warn(`Failed to fetch languages for ${githubName}:`, e);
+    console.error(`[SyncError] Failed to fetch languages for ${githubName}:`, e);
   }
 }
