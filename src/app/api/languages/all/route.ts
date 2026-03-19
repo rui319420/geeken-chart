@@ -14,8 +14,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const mode = searchParams.get("mode") === "average" ? "average" : "total";
 
-    // モードによってキャッシュキーを分ける
-    const CACHE_KEY = `languages:all:aggregated:${mode}`;
+    const CACHE_KEY = `languages:all:aggregated:${mode}:v7`;
 
     const cached =
       await redis.get<{ name: string; bytes?: number; percentage: number }[]>(CACHE_KEY);
@@ -24,27 +23,24 @@ export async function GET(request: Request) {
     let result;
 
     if (mode === "average") {
-      // 全言語を再取得して集計
-      const allLanguages = await prisma.userLanguage.findMany({
-        where: { user: { showLanguages: true } },
+      const validUsersQuery = await prisma.user.findMany({
+        where: { showLanguages: true },
+        select: {
+          id: true,
+          languages: { select: { language: true, bytes: true } },
+        },
       });
-      // ユーザーごとの割合の平均
-      const userLangMap: Record<string, { language: string; bytes: number }[]> = {};
-      for (const lang of allLanguages) {
-        if (!userLangMap[lang.userId]) userLangMap[lang.userId] = [];
-        userLangMap[lang.userId].push({ language: lang.language, bytes: lang.bytes });
-      }
 
       const scoreMap: Record<string, number> = {};
       let validUserCount = 0;
 
-      for (const userId in userLangMap) {
-        const userLangs = userLangMap[userId];
-        const userTotalBytes = userLangs.reduce((sum, l) => sum + l.bytes, 0);
+      for (const user of validUsersQuery) {
+        if (user.languages.length === 0) continue;
+        const userTotalBytes = user.languages.reduce((sum, l) => sum + l.bytes, 0);
         if (userTotalBytes === 0) continue;
 
         validUserCount++;
-        for (const lang of userLangs) {
+        for (const lang of user.languages) {
           const percentage = lang.bytes / userTotalBytes;
           scoreMap[lang.language] = (scoreMap[lang.language] || 0) + percentage;
         }
@@ -58,7 +54,6 @@ export async function GET(request: Request) {
         .sort((a, b) => b.percentage - a.percentage)
         .slice(0, 12);
     } else {
-      // 全バイト数の合計
       const groupedLanguages = await prisma.userLanguage.groupBy({
         by: ["language"],
         where: { user: { showLanguages: true } },
@@ -67,7 +62,6 @@ export async function GET(request: Request) {
 
       const totalBytes = groupedLanguages.reduce((sum, lang) => sum + (lang._sum.bytes ?? 0), 0);
 
-      // グラフ用のフォーマットに変換
       result = groupedLanguages
         .map((lang) => {
           const bytes = lang._sum.bytes ?? 0;
@@ -80,6 +74,7 @@ export async function GET(request: Request) {
         .sort((a, b) => b.bytes - a.bytes)
         .slice(0, 12);
     }
+
     await redis.set(CACHE_KEY, result, { ex: TTL });
     return NextResponse.json(result);
   } catch (error) {

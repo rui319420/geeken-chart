@@ -2,9 +2,15 @@
 
 import { signIn, signOut, useSession } from "next-auth/react";
 import Image from "next/image";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 export default function Header() {
   const { data: session, status } = useSession();
+  const pathname = usePathname();
+
+  // 現在のページが設定画面かどうかを判定
+  const isSettingsPage = pathname === "/settings";
 
   return (
     <header

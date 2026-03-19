@@ -2,36 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { PieChart, Pie, Cell, Sector, ResponsiveContainer, type PieSectorDataItem } from "recharts";
-
-const GITHUB_LANGUAGE_COLORS: Record<string, string> = {
-  TypeScript: "#3178c6",
-  JavaScript: "#f1e05a",
-  Python: "#3572A5",
-  C: "#555555",
-  "C++": "#f34b7d",
-  "C#": "#178600",
-  Java: "#b07219",
-  Go: "#00ADD8",
-  Rust: "#dea584",
-  Ruby: "#701516",
-  PHP: "#4F5D95",
-  Swift: "#F05138",
-  Kotlin: "#A97BFF",
-  Dart: "#00B4AB",
-  HTML: "#e34c26",
-  CSS: "#563d7c",
-  Shell: "#89e051",
-  Vue: "#42b883",
-};
-
-function getRandomColor(seed: string): string {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = seed.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const color = Math.floor(Math.abs(((Math.sin(hash) * 10000) % 1) * 16777215)).toString(16);
-  return "#" + "000000".substring(0, 6 - color.length) + color;
-}
+import { GITHUB_LANGUAGE_COLORS, getRandomColor } from "@/lib/constants";
 
 const renderActiveShape = ({
   cx,
@@ -126,8 +97,12 @@ export default function LanguagePieChart() {
   const [data, setData] = useState<LangData[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [includePrivate, setIncludePrivate] = useState<boolean | null>(null);
   const [mode, setMode] = useState<AggregationMode>("total");
+
+  const [settings, setSettings] = useState<{
+    includePrivate: boolean;
+    excludedLanguages: string[];
+  } | null>(null);
 
   const dataLengthRef = useRef(0);
   const activeIndexRef = useRef(0);
@@ -170,33 +145,36 @@ export default function LanguagePieChart() {
     [activeIndex],
   );
 
-  // 設定取得
+  // 設定取得（includePrivate と excludedLanguages を両方とる）
   useEffect(() => {
     fetch("/api/user/settings", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((s: { includePrivate?: boolean } | null) =>
-        setIncludePrivate(s?.includePrivate ?? false),
+      .then((s) =>
+        setSettings({
+          includePrivate: s?.includePrivate ?? false,
+          excludedLanguages: s?.excludedLanguages ?? [],
+        }),
       );
   }, []);
 
-  // データ取得（modeの変更も監視する）
+  // データ取得
   useEffect(() => {
-    if (includePrivate === null) return; // 設定取得待ち
+    if (!settings) return; // 設定取得待ち
 
     const fetchData = async () => {
-      setLoading(true); // モード切り替え時にローディングを出す
+      setLoading(true);
       try {
         const params = new URLSearchParams();
-        if (includePrivate) params.set("includePrivate", "true");
+        if (settings.includePrivate) params.set("includePrivate", "true");
         params.set("mode", mode);
+
         params.set("t", Date.now().toString());
 
-        const res = await fetch(`/api/languages/all?${params.toString()}`, {
-          cache: "no-store",
-        });
-        const json: LangData[] = await res.json();
-        setData(json);
-        dataLengthRef.current = json.length;
+        const res = await fetch(`/api/languages/all?${params.toString()}`);
+        const finalData = await res.json();
+
+        setData(finalData);
+        dataLengthRef.current = finalData?.length || 0;
         activeIndexRef.current = 0;
         setActiveIndex(0);
         startLoop(INITIAL_DELAY_MS);
@@ -211,7 +189,7 @@ export default function LanguagePieChart() {
 
     return () => stopLoop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [includePrivate, mode, startLoop]);
+  }, [settings, mode, startLoop]);
 
   return (
     <div className="flex h-112.5 w-full flex-col rounded-xl border border-[#2ea043]/40 bg-linear-to-br from-[#0d1117] to-[#181a26] p-4 shadow-[0_0_20px_rgba(88,101,242,0.15)] md:h-125 md:p-6">
@@ -219,7 +197,7 @@ export default function LanguagePieChart() {
         <div>
           <h2 className="text-xl font-bold tracking-wider text-[#F2F3F5]">言語割合（全体）</h2>
           <p className="mt-0.5 text-xs text-[#636e7b]">
-            {includePrivate
+            {settings?.includePrivate
               ? "公開・プライベート含むコード使用量を集計（GitHub Linguist）"
               : "公開リポジトリのコード使用量を集計（GitHub Linguist）"}
           </p>
