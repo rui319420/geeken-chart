@@ -49,11 +49,6 @@ interface ApiDay {
   topUser?: TopUser | null;
 }
 
-interface ApiResponse {
-  daily: ApiDay[];
-  weekly: ApiDay[];
-}
-
 interface DayData {
   date: string;
   count: number;
