@@ -33,7 +33,7 @@ const renderActiveShape = ({
 
   return (
     <g>
-      <text x={cx} y={cy} dy={8} textAnchor="middle" fill={fill} fontSize={22} fontWeight="bold">
+      <text x={cx} y={cy} dy={8} textAnchor="middle" fill={fill} fontSize={26} fontWeight="bold">
         {(payload as { name: string }).name}
       </text>
       <Sector
@@ -198,8 +198,8 @@ export default function LanguagePieChart() {
           <h2 className="text-xl font-bold tracking-wider text-[#F2F3F5]">言語割合（全体）</h2>
           <p className="mt-0.5 text-xs text-[#636e7b]">
             {settings?.includePrivate
-              ? "公開・プライベート含むコード使用量を集計（GitHub Linguist）"
-              : "公開リポジトリのコード使用量を集計（GitHub Linguist）"}
+              ? "GitHub Linguistを用いて集計"
+              : "GitHub Linguistを用いて集計"}
           </p>
         </div>
 
@@ -255,13 +255,15 @@ export default function LanguagePieChart() {
         </div>
       ) : (
         <ResponsiveContainer width="100%" height="100%">
-          <PieChart margin={{ top: 20, right: 120, bottom: 0, left: 120 }}>
+          {/* margin の左右を 100 から 60 程度に減らして、円の描画スペースを広げます */}
+          <PieChart margin={{ top: 20, right: 60, bottom: 0, left: 60 }}>
             <Pie
               data={data}
               cx="50%"
               cy="50%"
-              innerRadius="38%"
-              outerRadius="58%"
+              /* 半径を大きく調整 (内径 38%->45%, 外径 58%->70%) */
+              innerRadius="50%"
+              outerRadius="70%"
               dataKey="percentage"
               stroke="none"
               shape={renderShape}

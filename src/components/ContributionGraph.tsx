@@ -240,7 +240,8 @@ export default function ContributionGraph() {
       style={{
         background: "#0d1117",
         borderRadius: 12,
-        border: "1px solid #21262d",
+        border: "1px solid rgba(46, 160, 67, 0.4)",
+        boxShadow: "0 0 20px rgba(46, 160, 67, 0.15)",
         padding: "20px 24px",
         opacity: isVisible ? 1 : 0,
         transition: "opacity 0.5s ease",

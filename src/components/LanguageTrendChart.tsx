@@ -208,11 +208,11 @@ export default function LanguageTrendChart() {
   };
 
   return (
-    <div className="w-full rounded-xl border border-[#21262d] bg-[#0d1117] p-5 md:p-6">
+    <div className="w-full rounded-xl border border-[#2ea043]/40 bg-[#0d1117] p-5 shadow-[0_0_20px_rgba(46,160,67,0.15)] md:p-6">
       {/* ヘッダー */}
       <div className="mb-5 flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-base font-bold text-[#e6edf3]">人気言語ランキング</h3>
+          <h3 className="text-base font-bold text-[#e6edf3]">人気言語の推移</h3>
           <p className="mt-0.5 text-xs text-[#8b949e]">
             {includePrivate
               ? "公開・プライベート含む使用率の推移（直近1年）"
