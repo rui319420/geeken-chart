@@ -49,6 +49,11 @@ interface ApiDay {
   topUser?: TopUser | null;
 }
 
+interface ApiResponse {
+  daily: ApiDay[];
+  weekly: ApiDay[];
+}
+
 interface DayData {
   date: string;
   count: number;
@@ -57,7 +62,6 @@ interface DayData {
   topUser?: TopUser | null;
 }
 
-//「匿」アイコン＆GitHubアイコンを表示する共通コンポーネント
 const TopUserAvatar = ({ topUser, size = 20 }: { topUser: TopUser; size?: number }) => {
   if (!topUser.avatarUrl) {
     return (
@@ -102,49 +106,6 @@ function apiToChartData(raw: ApiDay[]): DayData[] {
   });
 }
 
-function filterByPeriod(data: DayData[], period: Period): DayData[] {
-  const now = new Date();
-  const cutoff = new Date();
-  if (period === "1m") cutoff.setMonth(now.getMonth() - 1);
-  else cutoff.setFullYear(now.getFullYear() - 1);
-
-  const filtered = data.filter((d) => new Date(d.date) >= cutoff);
-
-  if (period === "1y") {
-    const weekly: Record<string, DayData> = {};
-    filtered.forEach((d) => {
-      const dt = new Date(d.date);
-      const day = dt.getDay();
-      const diff = (day === 0 ? -6 : 1) - day;
-      const monday = new Date(dt);
-      monday.setDate(dt.getDate() + diff);
-      const key = monday.toISOString().split("T")[0];
-
-      if (!weekly[key]) {
-        weekly[key] = {
-          date: key,
-          count: 0,
-          label: `${monday.getMonth() + 1}/${monday.getDate()}`,
-          dayLabel: "",
-          topUser: null,
-        };
-      }
-      weekly[key].count += d.count;
-
-      // 週間MVPの暫定計算：その週の中で一番1日のコミット数が多かった人を1位とする
-      if (d.topUser) {
-        if (!weekly[key].topUser || d.topUser.count > weekly[key].topUser!.count) {
-          weekly[key].topUser = d.topUser;
-        }
-      }
-    });
-    return Object.values(weekly).sort((a, b) => a.date.localeCompare(b.date));
-  }
-
-  return filtered;
-}
-
-// X軸の下に日付とアイコンを描画するためのカスタムTick
 const CustomXAxisTick = (props: CustomXAxisTickProps) => {
   const { x, y, payload, data, period } = props;
 
@@ -191,7 +152,6 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
           コミット
         </span>
       </p>
-      {/* ツールチップ内にも1位の人の情報を表示 */}
       {data.topUser && (
         <div
           style={{
@@ -213,7 +173,10 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
 
 export default function ContributionGraph() {
   const [period, setPeriod] = useState<Period>("1m");
-  const [rawData, setRawData] = useState<DayData[]>([]);
+
+  const [dailyData, setDailyData] = useState<DayData[]>([]);
+  const [weeklyData, setWeeklyData] = useState<DayData[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [isVisible, setIsVisible] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -221,7 +184,13 @@ export default function ContributionGraph() {
   useEffect(() => {
     fetch("/api/contributions/all")
       .then((r) => r.json())
-      .then((json: ApiDay[]) => setRawData(apiToChartData(json)))
+      .then((json: ApiResponse) => {
+        // APIから受け取ったデータを、それぞれのステートに格納
+        if (json.daily && json.weekly) {
+          setDailyData(apiToChartData(json.daily));
+          setWeeklyData(apiToChartData(json.weekly));
+        }
+      })
       .catch((e) => console.error("Contributions fetch failed:", e))
       .finally(() => setLoading(false));
 
@@ -229,7 +198,18 @@ export default function ContributionGraph() {
     return () => clearTimeout(t);
   }, []);
 
-  const data = useMemo(() => filterByPeriod(rawData, period), [rawData, period]);
+  const data = useMemo(() => {
+    const now = new Date();
+    const cutoff = new Date();
+
+    if (period === "1m") {
+      cutoff.setMonth(now.getMonth() - 1);
+      return dailyData.filter((d) => new Date(d.date) >= cutoff);
+    } else {
+      cutoff.setFullYear(now.getFullYear() - 1);
+      return weeklyData.filter((d) => new Date(d.date) >= cutoff);
+    }
+  }, [dailyData, weeklyData, period]);
 
   const maxCount = data.length > 0 ? Math.max(...data.map((d) => d.count)) : 10;
   const tickInterval = period === "1y" ? Math.floor(data.length / 18) : 1;
