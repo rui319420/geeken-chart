@@ -86,7 +86,7 @@ export default async function HomePage() {
           <section className="mb-6">
             <ContributionGraph />
           </section>
-          <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+          <div className="mb-6 grid grid-cols-1 gap-5 xl:grid-cols-2">
             <LanguagePieChart />
             <AiModelPieChart />
           </div>

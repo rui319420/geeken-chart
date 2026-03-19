@@ -253,7 +253,7 @@ export default function AiModelPieChart() {
       <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         {" "}
         <div>
-          <h2 className="text-xl font-bold tracking-wider text-[#F2F3F5]">推しAI</h2>
+          <h2 className="text-xl font-bold tracking-wider text-[#F2F3F5]">❤ 推しAI ❤</h2>
           <p className="mt-0.5 text-xs text-[#636e7b]">
             メンバーが今1番推しているAIモデル（再投票可）
           </p>
