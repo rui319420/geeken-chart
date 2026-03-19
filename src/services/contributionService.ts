@@ -25,6 +25,9 @@ type WeeklyStats = {
 // 指定した日付が属する週の「月曜日」を返す関数
 function getMonday(dateStr: string) {
   const dt = new Date(dateStr);
+
+  if (isNaN(dt.getTime())) return new Date().toISOString().split("T")[0];
+
   const day = dt.getDay();
   const diff = (day === 0 ? -6 : 1) - day;
   const monday = new Date(dt);

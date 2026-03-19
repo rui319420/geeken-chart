@@ -5,7 +5,12 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const yearParam = searchParams.get("year");
-    const year = yearParam ? parseInt(yearParam) : null;
+
+    let year: number | null = null;
+    if (yearParam) {
+      const parsed = parseInt(yearParam, 10);
+      year = isNaN(parsed) ? null : parsed;
+    }
 
     const aggregatedData = await getAggregatedContributions(year);
 
