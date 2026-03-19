@@ -208,7 +208,7 @@ export default function LanguageTrendChart() {
   };
 
   return (
-    <div className="w-full rounded-xl border border-[#21262d] bg-[#0d1117] p-5 md:p-6">
+    <div className="w-full rounded-xl border border-[#2ea043]/40 bg-[#0d1117] p-5 shadow-[0_0_20px_rgba(46,160,67,0.15)] md:p-6">
       {/* ヘッダー */}
       <div className="mb-5 flex items-start justify-between gap-3">
         <div>

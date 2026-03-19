@@ -248,13 +248,14 @@ export default function AiModelPieChart() {
   const totalVotes = data.reduce((s, d) => s + d.value, 0);
 
   return (
-    <div className="flex h-112.5 w-full flex-col rounded-xl border border-[#2ea043]/40 bg-linear-to-br from-[#0d1117] to-[#181a26] p-4 shadow-[0_0_20px_rgba(88,101,242,0.15)] md:h-125 md:p-6">
+    <div className="flex h-112.5 w-full flex-col rounded-xl border border-[#ff79c6]/40 bg-linear-to-br from-[#0d1117] to-[#181a26] p-4 shadow-[0_0_20px_rgba(255,121,198,0.15)] md:h-125 md:p-6">
       {/* ヘッダー */}
       <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+        {" "}
         <div>
           <h2 className="text-xl font-bold tracking-wider text-[#F2F3F5]">推しAI</h2>
           <p className="mt-0.5 text-xs text-[#636e7b]">
-            メンバーが一番推しているAIモデル（再投票可）
+            メンバーが今1番推しているAIモデル（再投票可）
           </p>
         </div>
         <div className="flex items-center gap-2 text-xs text-[#484f58]">
