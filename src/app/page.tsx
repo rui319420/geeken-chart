@@ -9,6 +9,8 @@ import LanguageTrendChart from "@/components/LanguageTrendChart";
 import RefreshButton from "@/components/RefreshButton";
 import DiscordHeatmap from "@/components/DiscordHeatmap";
 import RadioNav from "@/components/RadioNav";
+import SurveyWidget from "@/components/SurveyWidget";
+import AiModelPieChart from "@/components/AiModelPieChart";
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -84,9 +86,10 @@ export default async function HomePage() {
           <section className="mb-6">
             <ContributionGraph />
           </section>
-          <section id="languages" className="mb-6">
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
             <LanguagePieChart />
-          </section>
+            <AiModelPieChart />
+          </div>
           <section className="mb-6">
             <LanguageTrendChart />
           </section>
