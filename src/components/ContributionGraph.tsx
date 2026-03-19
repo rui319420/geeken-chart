@@ -63,6 +63,8 @@ interface DayData {
 }
 
 const TopUserAvatar = ({ topUser, size = 20 }: { topUser: TopUser; size?: number }) => {
+  if (!topUser) return null;
+
   if (!topUser.avatarUrl) {
     return (
       <div
@@ -87,21 +89,25 @@ const TopUserAvatar = ({ topUser, size = 20 }: { topUser: TopUser; size?: number
   return (
     <img
       src={topUser.avatarUrl}
-      alt={topUser.displayName}
+      alt={topUser.displayName || "User"}
       style={{ width: size, height: size, borderRadius: "50%", border: "1px solid #484f58" }}
     />
   );
 };
 
 function apiToChartData(raw: ApiDay[]): DayData[] {
+  if (!raw || !Array.isArray(raw)) return [];
+
   return raw.map((d) => {
-    const dt = new Date(d.date);
+    const dt = new Date(d.date || "");
+    const isValidDate = dt instanceof Date && !isNaN(dt.getTime());
+
     return {
-      date: d.date,
-      count: d.count,
-      label: `${dt.getMonth() + 1}/${dt.getDate()}`,
-      dayLabel: String(dt.getDate()),
-      topUser: d.topUser,
+      date: d.date || "",
+      count: d.count || 0,
+      label: isValidDate ? `${dt.getMonth() + 1}/${dt.getDate()}` : "",
+      dayLabel: isValidDate ? String(dt.getDate()) : "",
+      topUser: d.topUser || null,
     };
   });
 }
@@ -109,7 +115,7 @@ function apiToChartData(raw: ApiDay[]): DayData[] {
 const CustomXAxisTick = (props: CustomXAxisTickProps) => {
   const { x, y, payload, data, period } = props;
 
-  if (x === undefined || y === undefined || !payload) return null;
+  if (x === undefined || y === undefined || !payload || !data) return null;
 
   const pointData = data.find((d: DayData) => d.date === payload.value);
 
@@ -133,7 +139,8 @@ const CustomXAxisTick = (props: CustomXAxisTickProps) => {
 const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   if (!active || !payload || payload.length === 0) return null;
 
-  const data = payload[0].payload;
+  const data = payload[0]?.payload;
+  if (!data) return null;
 
   return (
     <div
@@ -173,10 +180,8 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
 
 export default function ContributionGraph() {
   const [period, setPeriod] = useState<Period>("1m");
-
   const [dailyData, setDailyData] = useState<DayData[]>([]);
   const [weeklyData, setWeeklyData] = useState<DayData[]>([]);
-
   const [loading, setLoading] = useState(true);
   const [isVisible, setIsVisible] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -184,11 +189,13 @@ export default function ContributionGraph() {
   useEffect(() => {
     fetch("/api/contributions/all")
       .then((r) => r.json())
-      .then((json: ApiResponse) => {
-        // APIから受け取ったデータを、それぞれのステートに格納
-        if (json.daily && json.weekly) {
+      .then((json) => {
+        // ★ 安全対策: APIのレスポンスが想定通りか厳密にチェック
+        if (json && Array.isArray(json.daily) && Array.isArray(json.weekly)) {
           setDailyData(apiToChartData(json.daily));
           setWeeklyData(apiToChartData(json.weekly));
+        } else {
+          console.warn("APIから予期せぬデータが返却されました:", json);
         }
       })
       .catch((e) => console.error("Contributions fetch failed:", e))
@@ -199,6 +206,9 @@ export default function ContributionGraph() {
   }, []);
 
   const data = useMemo(() => {
+    // 安全対策
+    if (!dailyData || !weeklyData) return [];
+
     const now = new Date();
     const cutoff = new Date();
 
@@ -211,8 +221,8 @@ export default function ContributionGraph() {
     }
   }, [dailyData, weeklyData, period]);
 
-  const maxCount = data.length > 0 ? Math.max(...data.map((d) => d.count)) : 10;
-  const tickInterval = period === "1y" ? Math.floor(data.length / 18) : 1;
+  const maxCount = data?.length > 0 ? Math.max(...data.map((d) => d.count || 0)) : 10;
+  const tickInterval = period === "1y" ? Math.floor((data?.length || 0) / 18) : 1;
 
   return (
     <div
@@ -262,9 +272,7 @@ export default function ContributionGraph() {
         </div>
       </div>
 
-      {/* グラフ */}
       <div style={{ height: 240, width: "100%" }}>
-        {" "}
         {loading ? (
           <div
             style={{
@@ -288,11 +296,11 @@ export default function ContributionGraph() {
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 40 }}>
+            <LineChart data={data || []} margin={{ top: 10, right: 10, left: -10, bottom: 40 }}>
               <CartesianGrid strokeDasharray="1 3" stroke="#30363d" />
               <XAxis
                 dataKey="date"
-                tick={<CustomXAxisTick data={data} period={period} />}
+                tick={<CustomXAxisTick data={data || []} period={period} />}
                 tickLine={false}
                 axisLine={false}
                 interval={period === "1y" ? tickInterval : 0}
