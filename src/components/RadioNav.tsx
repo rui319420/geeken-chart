@@ -100,7 +100,15 @@ export default function RadioNav() {
             </svg>
           </NavItem>
 
-          <NavItem href="/#languages" label="言語">
+          <Divider />
+
+          <NavItem href="/ranking" label="ランキング">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+            </svg>
+          </NavItem>
+
+          <NavItem href="/frameworks" label="フレームワーク">
             <svg
               width="18"
               height="18"
@@ -118,26 +126,9 @@ export default function RadioNav() {
 
           <Divider />
 
-          <NavItem href="/#discord" label="Discord">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M5 18v3.766l1.515-.909L11.277 18H16c1.103 0 2-.897 2-2V8c0-1.103-.897-2-2-2H4c-1.103 0-2 .897-2 2v8c0 1.103.897 2 2 2h1zM4 8h12v8h-5.277L7 18.234V16H4V8z" />
-              <path d="M20 2H8c-1.103 0-2 .897-2 2h12c1.103 0 2 .897 2 2v8c1.103 0 2-.897 2-2V4c0-1.103-.897-2-2-2z" />
-            </svg>
-          </NavItem>
-
-          <NavItem href="/ranking" label="ランキング">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-            </svg>
-          </NavItem>
-
-          <Divider />
-
-          {/* 技研カテゴリ */}
           <SectionLabel label="技研" />
 
           <NavItem href="/works" label="制作物">
-            {/* ブックマーク/ポートフォリオアイコン */}
             <svg
               width="18"
               height="18"
@@ -155,7 +146,6 @@ export default function RadioNav() {
           </NavItem>
 
           <NavItem href="/sns" label="SNS">
-            {/* シェア/SNSアイコン */}
             <svg
               width="18"
               height="18"
@@ -176,7 +166,6 @@ export default function RadioNav() {
 
           <Divider />
 
-          {/* 個人カテゴリ */}
           <SectionLabel label="個人" />
 
           <NavItem href="/members" label="メンバー">

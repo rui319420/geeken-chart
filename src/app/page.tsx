@@ -94,9 +94,6 @@ export default async function HomePage() {
           <section id="discord" className="mb-6">
             <DiscordHeatmap />
           </section>
-          <section className="mb-6">
-            <FrameworkChart />
-          </section>
 
           {isDev && (
             <section className="mt-10 border-t border-white/5 pt-8">
