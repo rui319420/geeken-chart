@@ -12,12 +12,13 @@ const QUESTIONS = [
     description: "一番推したいプログラミング言語は？",
     color: "#3178c6",
     suggestions: [
-      "TypeScript",
       "Python",
-      "Rust",
-      "Go",
       "JavaScript",
+      "TypeScript",
+      "Rust",
+      "C",
       "C++",
+      "Go",
       "Kotlin",
       "Swift",
       "Java",
@@ -33,15 +34,15 @@ const QUESTIONS = [
     description: "開発環境として最高のOSは？",
     color: "#e8614a",
     suggestions: [
+      "Windows 11",
       "macOS",
       "Ubuntu",
       "Arch Linux",
-      "Windows 11",
       "Fedora",
       "Debian",
       "NixOS",
       "openSUSE",
-      "Windows + WSL2",
+      "WSL2",
     ],
   },
   {
@@ -52,8 +53,8 @@ const QUESTIONS = [
     color: "#f39c12",
     suggestions: [
       "VSCode",
+      "Cursor",
       "Neovim",
-      "JetBrains",
       "Docker",
       "Git",
       "Tmux",
@@ -61,10 +62,11 @@ const QUESTIONS = [
       "Raycast",
       "Figma",
       "Obsidian",
-      "GitHub Copilot",
-      "Claude",
+      "Valgrind",
+      "Make",
       "Zsh",
-      "Fish shell",
+      "GDB/LLDB",
+      "Postman",
     ],
   },
 ] as const;
@@ -399,7 +401,7 @@ export default function SurveyWidget() {
         <div>
           <h1 className="text-2xl font-bold text-[#e6edf3]">アンケート</h1>
           <p className="mt-1 text-sm text-[#636e7b]">
-            メンバーのおすすめ設定を集計しています。1人1カテゴリ1票です。
+            メンバーのおすすめ設定を集計しています。1カテゴリにつき1票です。
           </p>
         </div>
         {totalResponders > 0 && (
