@@ -21,7 +21,10 @@ function getCellStyle(value: number): { background: string; boxShadow: string } 
   if (value < 0.65)
     return { background: "rgba(79, 149, 255, 0.68)", boxShadow: "0 0 6px rgba(79,149,255,0.3)" };
   if (value < 0.82)
-    return { background: "rgba(100, 160, 255, 0.85)", boxShadow: "0 0 10px rgba(100,160,255,0.4)" };
+    return {
+      background: "rgba(100, 160, 255, 0.85)",
+      boxShadow: "0 0 10px rgba(100,160,255,0.4)",
+    };
   return { background: "rgba(130, 180, 255, 1.0)", boxShadow: "0 0 16px rgba(130,180,255,0.6)" };
 }
 
@@ -82,7 +85,7 @@ export default function DiscordHeatmap() {
     <div
       ref={containerRef}
       style={{
-        background: "linear-gradient(135deg, #0d1117 0%, #0f1520 100%)",
+        background: "#0d1117",
         border: "1px solid rgba(88, 101, 242, 0.25)",
         borderRadius: 12,
         padding: "16px 20px 14px",
@@ -106,7 +109,6 @@ export default function DiscordHeatmap() {
           Discord アクティビティ
         </h3>
 
-        {/* 今週/先週 切り替えボタンのみ復活 */}
         <div
           style={{
             display: "flex",

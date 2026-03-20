@@ -116,19 +116,14 @@ const RESUME_DELAY_MS = 100;
 export default function AiModelPieChart() {
   const { status } = useSession();
 
-  // サーバーから取得した自分の回答
   const [myAnswer, setMyAnswer] = useState<string | undefined>(undefined);
-  // チャートデータ
   const [chartData, setChartData] = useState<ChartData[]>([]);
   const [loading, setLoading] = useState(true);
-  // 再選択モード（回答済みでも投票UIを表示）
   const [reselecting, setReselecting] = useState(false);
-  // カスタム入力
   const [customInput, setCustomInput] = useState("");
   const [showCustom, setShowCustom] = useState(false);
   const [voting, setVoting] = useState(false);
 
-  // アニメーション
   const [activeIndex, setActiveIndex] = useState(0);
   const dataLengthRef = useRef(0);
   const activeIndexRef = useRef(0);
@@ -189,7 +184,6 @@ export default function AiModelPieChart() {
       const answered = json.myAnswers?.aimodel as string | undefined;
       setMyAnswer(answered);
 
-      // 回答済みでチャートがある → ループ開始
       if (answered && data.length > 0) {
         startLoop(INITIAL_DELAY_MS);
       }
@@ -205,7 +199,6 @@ export default function AiModelPieChart() {
     return () => stopLoop();
   }, [fetchData, stopLoop]);
 
-  // チャート表示に切り替わったらループ開始
   useEffect(() => {
     if (myAnswer && !reselecting && chartData.length > 0) {
       startLoop(INITIAL_DELAY_MS);
@@ -225,7 +218,7 @@ export default function AiModelPieChart() {
         body: JSON.stringify({ category: "aimodel", answer }),
       });
       await fetchData();
-      setReselecting(false); // 投票完了 → チャート表示へ
+      setReselecting(false);
     } catch (e) {
       console.error("Vote failed:", e);
     } finally {
@@ -242,15 +235,12 @@ export default function AiModelPieChart() {
   };
 
   const totalVotes = chartData.reduce((s, d) => s + d.value, 0);
-
-  // ─── 表示モードの判定 ──────────────────────────────────────────
-  // 「投票UIを見せるか」= 未回答 OR 再選択中
   const showVoteUI = !myAnswer || reselecting;
 
   // ─── ローディング ──────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="flex h-112.5 w-full items-center justify-center rounded-xl border border-[#2ea043]/40 bg-linear-to-br from-[#0d1117] to-[#181a26] md:h-125">
+      <div className="flex h-112.5 w-full items-center justify-center rounded-xl border border-[#ff79c6]/40 bg-[#0d1117] shadow-[0_0_20px_rgba(255,121,198,0.15)] md:h-125">
         <div className="flex items-center gap-2 text-[#949BA4]">
           <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
             <circle
@@ -272,7 +262,7 @@ export default function AiModelPieChart() {
   // ─── 投票UI（未回答 or 再選択中） ─────────────────────────────
   if (showVoteUI) {
     return (
-      <div className="flex h-112.5 w-full flex-col rounded-xl border border-[#2ea043]/40 bg-linear-to-br from-[#0d1117] to-[#181a26] p-4 shadow-[0_0_20px_rgba(88,101,242,0.15)] md:h-125 md:p-6">
+      <div className="flex h-112.5 w-full flex-col rounded-xl border border-[#ff79c6]/40 bg-[#0d1117] p-4 shadow-[0_0_20px_rgba(255,121,198,0.15)] md:h-125 md:p-6">
         {/* ヘッダー */}
         <div className="mb-6 flex items-start justify-between">
           <div>
@@ -283,7 +273,6 @@ export default function AiModelPieChart() {
               あなたが今一番おすすめするAIモデルを教えてください
             </p>
           </div>
-          {/* 再選択中は戻るボタン */}
           {reselecting && (
             <button
               onClick={() => setReselecting(false)}
@@ -305,7 +294,6 @@ export default function AiModelPieChart() {
           )}
         </div>
 
-        {/* 未ログイン */}
         {status === "unauthenticated" ? (
           <div className="flex flex-1 items-center justify-center">
             <p className="text-center text-sm text-[#636e7b]">
@@ -315,7 +303,6 @@ export default function AiModelPieChart() {
         ) : (
           <div className="flex flex-1 flex-col justify-between">
             <div className="space-y-4">
-              {/* 回答促進メッセージ（初回のみ） */}
               {!reselecting && (
                 <div className="flex items-start gap-3 rounded-lg border border-[#2ea043]/20 bg-[#2ea043]/5 px-4 py-3">
                   <span className="mt-0.5 text-base">💡</span>
@@ -327,7 +314,6 @@ export default function AiModelPieChart() {
                 </div>
               )}
 
-              {/* 選択肢 */}
               <div>
                 <p className="mb-3 text-xs font-medium text-[#636e7b]">AIを選んでください</p>
                 <div className="flex flex-wrap gap-2">
@@ -377,7 +363,6 @@ export default function AiModelPieChart() {
                 </div>
               </div>
 
-              {/* カスタム入力 */}
               {showCustom && (
                 <div className="flex gap-2">
                   <input
@@ -400,7 +385,6 @@ export default function AiModelPieChart() {
               )}
             </div>
 
-            {/* 総票数（再選択時は表示） */}
             {reselecting && totalVotes > 0 && (
               <p className="mt-4 text-right text-xs text-[#484f58]">{totalVotes} 票</p>
             )}
@@ -412,10 +396,9 @@ export default function AiModelPieChart() {
 
   // ─── チャートUI（回答済み） ────────────────────────────────────
   return (
-    <div className="flex h-112.5 w-full flex-col rounded-xl border border-[#ff79c6]/40 bg-linear-to-br from-[#0d1117] to-[#181a26] p-4 shadow-[0_0_20px_rgba(255,121,198,0.15)] md:h-125 md:p-6">
+    <div className="flex h-112.5 w-full flex-col rounded-xl border border-[#ff79c6]/40 bg-[#0d1117] p-4 shadow-[0_0_20px_rgba(255,121,198,0.15)] md:h-125 md:p-6">
       {/* ヘッダー */}
       <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        {" "}
         <div>
           <h2 className="text-xl font-bold tracking-wider text-[#F2F3F5]">❤ 推しAIの教え合い ❤</h2>
           <p className="mt-0.5 text-xs text-[#636e7b]">
@@ -423,7 +406,6 @@ export default function AiModelPieChart() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* 自分の回答バッジ */}
           {myAnswer && (
             <span
               className="rounded-full px-2.5 py-1 text-[11px] font-bold"
@@ -436,7 +418,6 @@ export default function AiModelPieChart() {
               ✓ {myAnswer}
             </span>
           )}
-          {/* 再選択ボタン */}
           <button
             onClick={() => setReselecting(true)}
             className="rounded-md border border-white/10 px-3 py-1.5 text-xs text-[#636e7b] transition-colors hover:border-white/20 hover:text-[#8b949e]"

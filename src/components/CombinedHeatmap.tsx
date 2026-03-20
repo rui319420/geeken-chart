@@ -31,7 +31,7 @@ function formatDate(dateStr: string): string {
 
 interface TooltipState {
   visible: boolean;
-  x: number; // containerRef 相対
+  x: number;
   y: number;
   date: string;
   count: number;
@@ -53,7 +53,6 @@ export default function CombinedHeatmap() {
   });
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ─── データ取得 ─────────────────────────────────────────────────
   useEffect(() => {
     const cached = cacheRef.current[period];
     if (cached) {
@@ -82,14 +81,11 @@ export default function CombinedHeatmap() {
       .finally(() => startTransition(() => setLoading(false)));
   }, [period]);
 
-  // ─── マウスイベント ─────────────────────────────────────────────
   const handleMouseOver = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as SVGElement;
     const date = target.getAttribute("data-date");
     const count = target.getAttribute("data-count");
 
-    // セルの上にいない場合は非表示タイマーをセットして維持
-    // （隙間・ラベル上は date が null）
     if (!date) {
       if (!hideTimerRef.current) {
         hideTimerRef.current = setTimeout(() => {
@@ -100,7 +96,6 @@ export default function CombinedHeatmap() {
       return;
     }
 
-    // セルの上にいる → タイマーをキャンセルして表示
     if (hideTimerRef.current) {
       clearTimeout(hideTimerRef.current);
       hideTimerRef.current = null;
@@ -110,18 +105,10 @@ export default function CombinedHeatmap() {
     const targetRect = target.getBoundingClientRect();
     if (!containerRect) return;
 
-    // セルの中心のX座標 (コンテナ相対)
     const x = targetRect.left - containerRect.left + targetRect.width / 2;
-    // セルの上端のY座標 (コンテナ相対)
     const y = targetRect.top - containerRect.top;
 
-    setTooltip({
-      visible: true,
-      x,
-      y,
-      date,
-      count: Number(count ?? 0),
-    });
+    setTooltip({ visible: true, x, y, date, count: Number(count ?? 0) });
   }, []);
 
   const handleMouseLeave = useCallback(() => {
@@ -133,7 +120,7 @@ export default function CombinedHeatmap() {
   }, []);
 
   return (
-    <div className="flex w-full flex-col rounded-xl border border-[#2ea043]/40 bg-linear-to-br from-[#0d1117] to-[#181a26] p-6 shadow-[0_0_20px_rgba(88,101,242,0.15)]">
+    <div className="flex w-full flex-col rounded-xl border border-[#2ea043]/40 bg-[#0d1117] p-6 shadow-[0_0_20px_rgba(46,160,67,0.15)]">
       {/* ヘッダー */}
       <div className="mb-5 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
         <div>
@@ -223,8 +210,6 @@ export default function CombinedHeatmap() {
                   }
                 >,
                 {
-                  // 各セルに日付とコミット数を埋め込む
-                  // hover時 event.target から直接読み取る
                   "data-date": activity.date,
                   "data-count": String(activity.count),
                   style: { cursor: "pointer" },
@@ -240,19 +225,16 @@ export default function CombinedHeatmap() {
         className="pointer-events-none absolute z-50 rounded-lg border border-[#30363d] shadow-xl"
         style={{
           left: tooltip.x,
-          top: tooltip.y - 6, // セルから少し上に浮かす
-          transform: "translate(-50%, -100%)", // 基準点をツールチップの中央下端にする
+          top: tooltip.y - 6,
+          transform: "translate(-50%, -100%)",
           background: "#161b22",
           padding: "8px 12px",
           opacity: tooltip.visible && tooltip.date ? 1 : 0,
           transition: "opacity 0.08s ease",
-          minWidth: "max-content", // コンテンツに合わせて幅を自動調整
+          minWidth: "max-content",
         }}
       >
-        {/* 本家風の下向き三角形（しっぽ） */}
         <div className="absolute -bottom-1.5 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-r border-b border-[#30363d] bg-[#161b22]" />
-
-        {/* ツールチップの中身 */}
         <div className="relative z-10">
           {tooltip.date && (
             <>

@@ -239,18 +239,15 @@ export default function FrameworkChart() {
     switch (sortKey) {
       case "popular":
         return [...filtered].sort((a, b) => b.totalRepos - a.totalRepos).slice(0, 20);
-
       case "category":
         return [...filtered]
           .sort((a, b) => {
             const catA = CATEGORY_ORDER.indexOf(getCategory(a.framework));
             const catB = CATEGORY_ORDER.indexOf(getCategory(b.framework));
             if (catA !== catB) return catA - catB;
-            // 同カテゴリ内はリポジトリ数降順
             return b.totalRepos - a.totalRepos;
           })
           .slice(0, 20);
-
       case "name":
         return [...filtered]
           .sort((a, b) => a.framework.localeCompare(b.framework, "ja"))
@@ -261,12 +258,11 @@ export default function FrameworkChart() {
   const chartHeight = Math.max(sorted.length * 36 + 40, 160);
 
   return (
-    <div className="w-full rounded-xl border border-[#2ea043]/40 bg-gradient-to-br from-[#0d1117] to-[#181a26] p-5 shadow-[0_0_24px_rgba(46,160,67,0.15)]">
+    <div className="w-full rounded-xl border border-[#2ea043]/40 bg-[#0d1117] p-5 shadow-[0_0_20px_rgba(46,160,67,0.15)]">
       <h3 className="mb-1 text-base font-bold text-[#e6edf3]">使用フレームワーク（全体）</h3>
 
       {/* ソート + カテゴリフィルター */}
       <div className="mb-5 flex flex-col gap-3">
-        {/* ソートボタン */}
         <div className="flex items-center gap-2">
           <span className="text-xs text-[#636e7b]">並び替え</span>
           <div className="flex rounded-lg bg-[#161b22] p-1">
@@ -288,7 +284,6 @@ export default function FrameworkChart() {
           </div>
         </div>
 
-        {/* カテゴリフィルター */}
         <div className="flex flex-wrap gap-2">
           <span className="text-xs text-[#636e7b]">絞り込み</span>
           {ALL_CATEGORIES.map((cat) => {

@@ -27,7 +27,6 @@ const renderActiveShape = ({
   const ey = my;
   const textAnchor = cos >= 0 ? "start" : "end";
 
-  // KBの表示（バイト数が0の場合は非表示）
   const payloadData = payload as { bytes?: number };
   const bytesText = payloadData.bytes ? `${(payloadData.bytes / 1024).toFixed(0)} KB` : "";
 
@@ -145,7 +144,6 @@ export default function LanguagePieChart() {
     [activeIndex],
   );
 
-  // 設定取得（includePrivate と excludedLanguages を両方とる）
   useEffect(() => {
     fetch("/api/user/settings", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
@@ -157,9 +155,8 @@ export default function LanguagePieChart() {
       );
   }, []);
 
-  // データ取得
   useEffect(() => {
-    if (!settings) return; // 設定取得待ち
+    if (!settings) return;
 
     const fetchData = async () => {
       setLoading(true);
@@ -167,7 +164,6 @@ export default function LanguagePieChart() {
         const params = new URLSearchParams();
         if (settings.includePrivate) params.set("includePrivate", "true");
         params.set("mode", mode);
-
         params.set("t", Date.now().toString());
 
         const res = await fetch(`/api/languages/all?${params.toString()}`);
@@ -192,18 +188,13 @@ export default function LanguagePieChart() {
   }, [settings, mode, startLoop]);
 
   return (
-    <div className="flex h-112.5 w-full flex-col rounded-xl border border-[#2ea043]/40 bg-linear-to-br from-[#0d1117] to-[#181a26] p-4 shadow-[0_0_20px_rgba(88,101,242,0.15)] md:h-125 md:p-6">
+    <div className="flex h-112.5 w-full flex-col rounded-xl border border-[#2ea043]/40 bg-[#0d1117] p-4 shadow-[0_0_20px_rgba(46,160,67,0.15)] md:h-125 md:p-6">
       <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
           <h2 className="text-xl font-bold tracking-wider text-[#F2F3F5]">言語割合（全体）</h2>
-          <p className="mt-0.5 text-xs text-[#636e7b]">
-            {settings?.includePrivate
-              ? "GitHub Linguistを用いて集計"
-              : "GitHub Linguistを用いて集計"}
-          </p>
+          <p className="mt-0.5 text-xs text-[#636e7b]">GitHub Linguistを用いて集計</p>
         </div>
 
-        {/* モード切替トグル */}
         <div className="flex items-center gap-2 rounded-lg bg-black/40 p-1">
           <button
             onClick={() => setMode("total")}
@@ -255,13 +246,11 @@ export default function LanguagePieChart() {
         </div>
       ) : (
         <ResponsiveContainer width="100%" height="100%">
-          {/* margin の左右を 100 から 60 程度に減らして、円の描画スペースを広げます */}
           <PieChart margin={{ top: 20, right: 60, bottom: 0, left: 60 }}>
             <Pie
               data={data}
               cx="50%"
               cy="50%"
-              /* 半径を大きく調整 (内径 38%->45%, 外径 58%->70%) */
               innerRadius="50%"
               outerRadius="70%"
               dataKey="percentage"
