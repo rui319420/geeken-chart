@@ -170,17 +170,25 @@ export default function LanguageTrendChart() {
   useEffect(() => {
     if (includePrivate === null) return;
 
-    setLoading(true);
-    const params = new URLSearchParams();
-    params.set("mode", mode);
-    if (includePrivate) params.set("includePrivate", "true");
-    params.set("t", Date.now().toString());
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams();
+        params.set("mode", mode);
+        if (includePrivate) params.set("includePrivate", "true");
+        params.set("t", Date.now().toString());
 
-    fetch(`/api/languages/trend?${params.toString()}`, { cache: "no-store" })
-      .then((r) => r.json())
-      .then((json: DataPoint[]) => setData(json))
-      .catch((e) => console.error("Trend fetch failed:", e))
-      .finally(() => setLoading(false));
+        const r = await fetch(`/api/languages/trend?${params.toString()}`, { cache: "no-store" });
+        const json: DataPoint[] = await r.json();
+        setData(json);
+      } catch (e) {
+        console.error("Trend fetch failed:", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   }, [includePrivate, mode]);
 
   const languages = useMemo(() => {

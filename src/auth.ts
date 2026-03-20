@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import GitHub from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
-import { syncUserLanguages } from "@/services/userService";
+import { syncUserLanguages, syncUserStats } from "@/services/userService";
 import { waitUntil } from "@vercel/functions";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -63,10 +63,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           });
         }
 
-        // ユーザー自身のトークンを取得
         const githubName = profile.login as string;
         const userToken = account.access_token;
+
+        // 言語データ同期（24時間以内に更新済みならスキップ）
         waitUntil(syncUserLanguages(userId, githubName, userToken).catch(console.error));
+
+        // stats + contributions 同期（新規ユーザーor1時間以上未更新の場合のみ）
+        waitUntil(syncUserStats(userId, githubName, userToken).catch(console.error));
       }
     },
     async signOut(message) {
