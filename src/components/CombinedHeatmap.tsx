@@ -73,9 +73,10 @@ export default function CombinedHeatmap() {
         if (!res.ok) throw new Error("fetch error");
         return res.json();
       })
-      .then((json: ContributionData[]) => {
-        cacheRef.current[period] = json;
-        startTransition(() => setData(json));
+      .then((json: { daily: ContributionData[]; weekly: ContributionData[] }) => {
+        const dailyData = json.daily || [];
+        cacheRef.current[period] = dailyData;
+        startTransition(() => setData(dailyData));
       })
       .catch((e) => console.error("Failed to fetch contributions:", e))
       .finally(() => startTransition(() => setLoading(false)));
@@ -132,10 +133,7 @@ export default function CombinedHeatmap() {
   }, []);
 
   return (
-    <div
-      ref={containerRef}
-      className="relative flex w-full flex-col rounded-xl border border-[#2ea043]/40 bg-gradient-to-br from-[#0d1117] to-[#181a26] p-6 shadow-[0_0_20px_rgba(88,101,242,0.15)]"
-    >
+    <div className="flex w-full flex-col rounded-xl border border-[#2ea043]/40 bg-linear-to-br from-[#0d1117] to-[#181a26] p-6 shadow-[0_0_20px_rgba(88,101,242,0.15)]">
       {/* ヘッダー */}
       <div className="mb-5 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
         <div>

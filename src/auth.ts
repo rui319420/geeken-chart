@@ -2,9 +2,8 @@ import NextAuth from "next-auth";
 import GitHub from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
-import { getUserLanguageStats } from "@/lib/github";
-
-const GITHUB_TOKEN = process.env.GITHUB_ACCESS_TOKEN;
+import { syncUserLanguages } from "@/services/userService";
+import { waitUntil } from "@vercel/functions";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
@@ -47,6 +46,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (!userId || !profile) return;
 
       if (account?.provider === "github") {
+        // ユーザー情報とアクセストークンの更新
         await prisma.user.update({
           where: { id: userId },
           data: {
@@ -62,33 +62,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             data: { access_token: account.access_token },
           });
         }
-      }
 
-      const existingLanguages = await prisma.userLanguage.count({
-        where: { userId: userId },
-      });
-
-      const githubName = profile.login as string;
-
-      if (existingLanguages === 0 && GITHUB_TOKEN && githubName) {
-        try {
-          const report = await getUserLanguageStats(githubName, {
-            token: GITHUB_TOKEN,
-            concurrency: 5,
-          });
-
-          await Promise.all(
-            report.stats.slice(0, 20).map((stat) =>
-              prisma.userLanguage.upsert({
-                where: { userId_language: { userId: userId, language: stat.language } },
-                update: { bytes: stat.bytes },
-                create: { userId: userId, language: stat.language, bytes: stat.bytes },
-              }),
-            ),
-          );
-        } catch (e) {
-          console.warn(`Failed to fetch languages for ${githubName}:`, e);
-        }
+        // ユーザー自身のトークンを取得
+        const githubName = profile.login as string;
+        const userToken = account.access_token;
+        waitUntil(syncUserLanguages(userId, githubName, userToken).catch(console.error));
       }
     },
     async signOut(message) {
