@@ -38,7 +38,6 @@ interface PrefetchedData {
 
 // ──────────────────────────────────────────────────────────────────
 // リポジトリ一覧 + 全言語データを1回だけ取得してまとめて返す
-// language stats / history / framework deps の3ステップで使い回す
 // ──────────────────────────────────────────────────────────────────
 
 async function prefetchUserData(
@@ -71,7 +70,6 @@ async function prefetchUserData(
 
 // ──────────────────────────────────────────────────────────────────
 // 言語バイト数を集計して LanguageStat[] に変換
-// getUserLanguageStats の代わりにキャッシュデータから直接計算
 // ──────────────────────────────────────────────────────────────────
 
 const EXCLUDED_LANGUAGES = new Set(["ShaderLab", "HLSL", "GLSL", "Jupyter Notebook"]);
@@ -108,7 +106,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // force=true のとき差分スキップを無効化してフル更新
   const body = (await request.json().catch(() => ({}))) as { force?: boolean };
   const force: boolean = body.force === true;
 
@@ -149,9 +146,7 @@ export async function POST(request: Request) {
           usedPrivateToken: usePrivate,
         };
 
-        // ──────────────────────────────────────────────────────────
-        // 差分チェック: force=false かつ1時間以内に更新済みはスキップ
-        // ──────────────────────────────────────────────────────────
+        // ── 差分チェック ──────────────────────────────────────────
         if (!force && user.statsUpdatedAt) {
           const diffMs = Date.now() - user.statsUpdatedAt.getTime();
           if (diffMs < 60 * 60 * 1000) {
@@ -160,10 +155,7 @@ export async function POST(request: Request) {
           }
         }
 
-        // ──────────────────────────────────────────────────────────
-        // 0. リポジトリ一覧 + 言語データをまとめて1回だけ取得
-        //    language stats / history / framework deps で使い回す
-        // ──────────────────────────────────────────────────────────
+        // ── 0. プリフェッチ ───────────────────────────────────────
         let prefetched: PrefetchedData = { repos: [], languageMap: new Map() };
 
         try {
@@ -175,26 +167,29 @@ export async function POST(request: Request) {
           console.error(`Prefetch failed for ${githubName}:`, e);
           result.error = appendError(result.error, `prefetch: ${errorMsg(e)}`);
           results.push(result);
-          return; // プリフェッチ失敗時は以降のステップも無意味なので早期リターン
+          return;
         }
 
         const { repos, languageMap } = prefetched;
 
-        // ──────────────────────────────────────────────────────────
-        // 1. 言語データを UserLanguage テーブルに保存（円グラフ用）
-        //    プリフェッチ済みデータから直接集計するためAPI呼び出しなし
-        // ──────────────────────────────────────────────────────────
+        // ── 1. 言語データ保存（deleteMany + createMany をトランザクションで一括） ──
+        //
+        // deleteMany に成功して createMany が失敗すると言語データが消えたままになるため、
+        // $transaction でまとめることでどちらかが失敗した場合に両方ロールバックする。
         try {
           const stats = aggregateLanguages(languageMap);
+          const top20 = stats.slice(0, 20);
 
-          await prisma.userLanguage.deleteMany({ where: { userId: user.id } });
-          await prisma.userLanguage.createMany({
-            data: stats.slice(0, 20).map((s) => ({
-              userId: user.id,
-              language: s.language,
-              bytes: s.bytes,
-            })),
-          });
+          await prisma.$transaction([
+            prisma.userLanguage.deleteMany({ where: { userId: user.id } }),
+            prisma.userLanguage.createMany({
+              data: top20.map((s) => ({
+                userId: user.id,
+                language: s.language,
+                bytes: s.bytes,
+              })),
+            }),
+          ]);
 
           result.languages = stats.length;
         } catch (e) {
@@ -202,10 +197,11 @@ export async function POST(request: Request) {
           result.error = appendError(result.error, `languages: ${errorMsg(e)}`);
         }
 
-        // ──────────────────────────────────────────────────────────
-        // 2. 言語ヒストリーを LanguageSnapshot に保存（折れ線グラフ用）
-        //    repos と languageMap をキャッシュとして渡す
-        // ──────────────────────────────────────────────────────────
+        // ── 2. 言語ヒストリー保存（複数 upsert をトランザクションで一括） ──────────
+        //
+        // 月数 × 言語数ぶんの upsert が途中で失敗すると、
+        // 一部の月だけ保存された不整合なスナップショットが残る。
+        // interactive transaction でまとめることで全成功 or 全ロールバックを保証する。
         try {
           const historicalSnapshots = await buildHistoricalSnapshots(githubName, token, {
             monthsBack: 12,
@@ -216,19 +212,21 @@ export async function POST(request: Request) {
             cachedLanguages: languageMap,
           });
 
-          await Promise.all(
-            historicalSnapshots.flatMap(({ month, languages }) =>
-              Object.entries(languages).map(([language, bytes]) =>
-                prisma.languageSnapshot.upsert({
-                  where: {
-                    userId_language_month: { userId: user.id, language, month },
-                  },
-                  update: { bytes },
-                  create: { userId: user.id, language, bytes, month },
-                }),
+          await prisma.$transaction(async (tx) => {
+            await Promise.all(
+              historicalSnapshots.flatMap(({ month, languages }) =>
+                Object.entries(languages).map(([language, bytes]) =>
+                  tx.languageSnapshot.upsert({
+                    where: {
+                      userId_language_month: { userId: user.id, language, month },
+                    },
+                    update: { bytes },
+                    create: { userId: user.id, language, bytes, month },
+                  }),
+                ),
               ),
-            ),
-          );
+            );
+          });
 
           result.snapshotMonths = historicalSnapshots.length;
         } catch (e) {
@@ -236,9 +234,7 @@ export async function POST(request: Request) {
           result.error = appendError(result.error, `history: ${errorMsg(e)}`);
         }
 
-        // ──────────────────────────────────────────────────────────
-        // 3. コントリビューションを Redis に保存（草グラフ用）
-        // ──────────────────────────────────────────────────────────
+        // ── 3. コントリビューション保存（Redis のみ、DBトランザクション不要） ────────
         try {
           const contribToken = oauthToken ?? FALLBACK_TOKEN;
           const data = await getContributionData(githubName, contribToken);
@@ -253,9 +249,7 @@ export async function POST(request: Request) {
           result.error = appendError(result.error, `contributions: ${errorMsg(e)}`);
         }
 
-        // ──────────────────────────────────────────────────────────
-        // 4. ランキング用 GitHub Stats の取得と保存
-        // ──────────────────────────────────────────────────────────
+        // ── 4. GitHub Stats 保存（単一 update のため元々アトミック、変更なし） ────────
         try {
           const stats = await fetchUserGitHubStats(githubName, token);
           const score = calculateGitHubScore(stats);
@@ -276,22 +270,25 @@ export async function POST(request: Request) {
           result.error = appendError(result.error, `stats: ${errorMsg(e)}`);
         }
 
-        // ── 5. フレームワーク依存情報を取得して保存 ──
+        // ── 5. フレームワーク保存（deleteMany + createMany をトランザクションで一括） ──
+        //
+        // Step 1 と同様に、delete 後に create が失敗するとフレームワークデータが消える。
+        // $transaction でまとめることでロールバックを保証する。
         try {
           const frameworkStats = await getUserFrameworkStats(githubName, token, 5, repos);
 
-          // ↓ frameworkStats が空でも delete が走っていたのが原因
-          // 取得成功かつ1件以上あるときだけ delete → insert
           if (frameworkStats.length > 0) {
-            await prisma.frameworkUsage.deleteMany({ where: { userId: user.id } });
-            await prisma.frameworkUsage.createMany({
-              data: frameworkStats.map((f) => ({
-                userId: user.id,
-                framework: f.framework,
-                ecosystem: f.ecosystem,
-                repoCount: f.repoCount,
-              })),
-            });
+            await prisma.$transaction([
+              prisma.frameworkUsage.deleteMany({ where: { userId: user.id } }),
+              prisma.frameworkUsage.createMany({
+                data: frameworkStats.map((f) => ({
+                  userId: user.id,
+                  framework: f.framework,
+                  ecosystem: f.ecosystem,
+                  repoCount: f.repoCount,
+                })),
+              }),
+            ]);
           }
 
           result.frameworks = frameworkStats.length;
@@ -299,14 +296,13 @@ export async function POST(request: Request) {
           console.error(`Framework fetch failed for ${githubName}:`, e);
           result.error = appendError(result.error, `frameworks: ${errorMsg(e)}`);
         }
+
         results.push(result);
       }),
     ),
   );
 
-  // ──────────────────────────────────────────────────────────────────
-  // 集計キャッシュをクリア
-  // ──────────────────────────────────────────────────────────────────
+  // ── 集計キャッシュをクリア ──────────────────────────────────────
   await Promise.all([
     redis.del("stats:dashboard"),
     redis.del("languages:all:aggregated:total"),
