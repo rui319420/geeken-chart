@@ -33,6 +33,8 @@ const GITHUB_LANGUAGE_COLORS: Record<string, string> = {
   Vue: "#42b883",
 };
 
+type TrendMode = "total" | "average";
+
 interface DataPoint {
   month: string;
   [lang: string]: string | number;
@@ -152,6 +154,7 @@ export default function LanguageTrendChart() {
   const [hiddenLines, setHiddenLines] = useState<Set<string>>(new Set());
   const [data, setData] = useState<DataPoint[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mode, setMode] = useState<TrendMode>("total");
   const [includePrivate, setIncludePrivate] = useState<boolean | null>(null);
 
   // 1. 設定取得
@@ -163,31 +166,22 @@ export default function LanguageTrendChart() {
       );
   }, []);
 
-  // 2. データ取得（設定確定後に実行）
+  // 2. データ取得（設定 or モード変更時）
   useEffect(() => {
-    if (includePrivate === null) return; // 設定取得待ち
+    if (includePrivate === null) return;
 
-    const fetchData = async () => {
-      try {
-        const params = new URLSearchParams();
-        if (includePrivate) params.set("includePrivate", "true");
-        params.set("t", Date.now().toString());
+    setLoading(true);
+    const params = new URLSearchParams();
+    params.set("mode", mode);
+    if (includePrivate) params.set("includePrivate", "true");
+    params.set("t", Date.now().toString());
 
-        // 言語トレンドAPI
-        const res = await fetch(`/api/languages/trend?${params.toString()}`, {
-          cache: "no-store",
-        });
-        const json: DataPoint[] = await res.json();
-        setData(json);
-      } catch (e) {
-        console.error("Trend fetch failed:", e);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [includePrivate]);
+    fetch(`/api/languages/trend?${params.toString()}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((json: DataPoint[]) => setData(json))
+      .catch((e) => console.error("Trend fetch failed:", e))
+      .finally(() => setLoading(false));
+  }, [includePrivate, mode]);
 
   const languages = useMemo(() => {
     const keys = new Set<string>();
@@ -198,27 +192,28 @@ export default function LanguageTrendChart() {
   const toggleLine = (lang: string) => {
     setHiddenLines((prev) => {
       const next = new Set(prev);
-      if (next.has(lang)) {
-        next.delete(lang);
-      } else {
-        next.add(lang);
-      }
+      if (next.has(lang)) next.delete(lang);
+      else next.add(lang);
       return next;
     });
+  };
+
+  const modeDescription = {
+    total: "全バイト数を月ごとに合計した使用率の推移（直近1年）",
+    average: "1人当たりの言語割合を平均した推移（直近1年）",
   };
 
   return (
     <div className="w-full rounded-xl border border-[#2ea043]/40 bg-[#0d1117] p-5 shadow-[0_0_20px_rgba(46,160,67,0.15)] md:p-6">
       {/* ヘッダー */}
-      <div className="mb-5 flex items-start justify-between gap-3">
+      <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
         <div>
           <h3 className="text-base font-bold text-[#e6edf3]">人気言語の推移</h3>
           <p className="mt-0.5 text-xs text-[#8b949e]">
-            {includePrivate
-              ? "公開・プライベート含む使用率の推移（直近1年）"
-              : "公開リポジトリの使用率の推移（直近1年）"}
+            {includePrivate ? "公開・プライベート含む" : "公開リポジトリ"} / {modeDescription[mode]}
           </p>
         </div>
+
         <div className="flex shrink-0 items-center gap-2">
           {includePrivate && (
             <span className="flex items-center gap-1 rounded-full border border-[#388bfd]/30 bg-[#388bfd]/10 px-2.5 py-1 text-[11px] font-medium text-[#388bfd]">
@@ -236,6 +231,31 @@ export default function LanguageTrendChart() {
               プライベート含む
             </span>
           )}
+
+          {/* モード切替トグル */}
+          <div className="flex items-center gap-2 rounded-lg bg-black/40 p-1">
+            <button
+              onClick={() => setMode("total")}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-all duration-200 ${
+                mode === "total"
+                  ? "bg-[#388bfd]/20 text-[#388bfd] shadow-[0_0_10px_rgba(56,139,253,0.3)]"
+                  : "text-[#949BA4] hover:text-[#F2F3F5]"
+              }`}
+            >
+              全体合計
+            </button>
+            <button
+              onClick={() => setMode("average")}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-all duration-200 ${
+                mode === "average"
+                  ? "bg-[#388bfd]/20 text-[#388bfd] shadow-[0_0_10px_rgba(56,139,253,0.3)]"
+                  : "text-[#949BA4] hover:text-[#F2F3F5]"
+              }`}
+            >
+              ユーザー平均
+            </button>
+          </div>
+
           <span
             className="cursor-help text-[#636e7b]"
             title="各リポジトリの作成日を使い、その月末時点で存在していたリポジトリをGitHub Linguistで集計しています。"
@@ -291,7 +311,6 @@ export default function LanguageTrendChart() {
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 8, right: 24, left: -4, bottom: 0 }}>
               <CartesianGrid strokeDasharray="1 3" stroke="#21262d" vertical={false} />
-
               <XAxis
                 dataKey="month"
                 tick={{ fill: "#8b949e", fontSize: 11 }}
@@ -299,7 +318,6 @@ export default function LanguageTrendChart() {
                 axisLine={false}
                 dy={6}
               />
-
               <YAxis
                 tick={{ fill: "#8b949e", fontSize: 11 }}
                 tickLine={false}
@@ -309,9 +327,7 @@ export default function LanguageTrendChart() {
                 domain={[0, "auto"]}
                 allowDecimals={false}
               />
-
               <Tooltip content={<CustomTooltip />} cursor={{ stroke: "#30363d", strokeWidth: 1 }} />
-
               <Legend
                 content={(props) => (
                   <CustomLegend
@@ -321,7 +337,6 @@ export default function LanguageTrendChart() {
                   />
                 )}
               />
-
               {languages.map((lang) => (
                 <Line
                   key={lang}
