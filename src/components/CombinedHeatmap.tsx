@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, startTransition } from "react";
+import React, { useEffect, useState, useRef, startTransition, useCallback } from "react";
 import { ActivityCalendar, type ThemeInput } from "react-activity-calendar";
 
 type ContributionData = {
@@ -23,12 +23,37 @@ const githubTheme: ThemeInput = {
   dark: ["#161b22", "#0e4429", "#006d32", "#26a641", "#39d353"],
 };
 
+function formatDate(dateStr: string): string {
+  const date = new Date(dateStr + "T00:00:00");
+  const days = ["日", "月", "火", "水", "木", "金", "土"];
+  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 (${days[date.getDay()]})`;
+}
+
+interface TooltipState {
+  visible: boolean;
+  x: number; // containerRef 相対
+  y: number;
+  date: string;
+  count: number;
+}
+
 export default function CombinedHeatmap() {
   const [period, setPeriod] = useState<Period>("latest");
   const [data, setData] = useState<ContributionData[]>([]);
   const [loading, setLoading] = useState(true);
   const cacheRef = useRef<Partial<Record<Period, ContributionData[]>>>({});
+  const containerRef = useRef<HTMLDivElement>(null);
 
+  const [tooltip, setTooltip] = useState<TooltipState>({
+    visible: false,
+    x: 0,
+    y: 0,
+    date: "",
+    count: 0,
+  });
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ─── データ取得 ─────────────────────────────────────────────────
   useEffect(() => {
     const cached = cacheRef.current[period];
     if (cached) {
@@ -38,7 +63,6 @@ export default function CombinedHeatmap() {
       });
       return;
     }
-
     startTransition(() => setLoading(true));
 
     const url =
@@ -46,7 +70,7 @@ export default function CombinedHeatmap() {
 
     fetch(url)
       .then((res) => {
-        if (!res.ok) throw new Error("Network response was not ok");
+        if (!res.ok) throw new Error("fetch error");
         return res.json();
       })
       .then((json: { daily: ContributionData[]; weekly: ContributionData[] }) => {
@@ -54,11 +78,59 @@ export default function CombinedHeatmap() {
         cacheRef.current[period] = dailyData;
         startTransition(() => setData(dailyData));
       })
-      .catch((error) => {
-        console.error("Failed to fetch combined contributions:", error);
-      })
+      .catch((e) => console.error("Failed to fetch contributions:", e))
       .finally(() => startTransition(() => setLoading(false)));
   }, [period]);
+
+  // ─── マウスイベント ─────────────────────────────────────────────
+  const handleMouseOver = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as SVGElement;
+    const date = target.getAttribute("data-date");
+    const count = target.getAttribute("data-count");
+
+    // セルの上にいない場合は非表示タイマーをセットして維持
+    // （隙間・ラベル上は date が null）
+    if (!date) {
+      if (!hideTimerRef.current) {
+        hideTimerRef.current = setTimeout(() => {
+          setTooltip((p) => ({ ...p, visible: false }));
+          hideTimerRef.current = null;
+        }, 120);
+      }
+      return;
+    }
+
+    // セルの上にいる → タイマーをキャンセルして表示
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+
+    const containerRect = containerRef.current?.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    if (!containerRect) return;
+
+    // セルの中心のX座標 (コンテナ相対)
+    const x = targetRect.left - containerRect.left + targetRect.width / 2;
+    // セルの上端のY座標 (コンテナ相対)
+    const y = targetRect.top - containerRect.top;
+
+    setTooltip({
+      visible: true,
+      x,
+      y,
+      date,
+      count: Number(count ?? 0),
+    });
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = setTimeout(() => {
+      setTooltip((p) => ({ ...p, visible: false }));
+      hideTimerRef.current = null;
+    }, 150);
+  }, []);
 
   return (
     <div className="flex w-full flex-col rounded-xl border border-[#2ea043]/40 bg-linear-to-br from-[#0d1117] to-[#181a26] p-6 shadow-[0_0_20px_rgba(88,101,242,0.15)]">
@@ -69,7 +141,6 @@ export default function CombinedHeatmap() {
           <p className="mt-0.5 text-xs text-[#949BA4]">メンバー全員のコントリビューションを集計</p>
         </div>
 
-        {/* 期間タブ */}
         <div className="flex rounded-lg bg-[#1E1F22] p-1">
           {(Object.keys(periodLabels) as Period[]).map((p) => (
             <button
@@ -89,7 +160,11 @@ export default function CombinedHeatmap() {
       </div>
 
       {/* ヒートマップ */}
-      <div className="overflow-x-auto rounded-lg bg-[#0d1117] p-5">
+      <div
+        className="overflow-x-auto rounded-lg bg-[#0d1117] p-5"
+        onMouseOver={handleMouseOver}
+        onMouseLeave={handleMouseLeave}
+      >
         {loading ? (
           <div className="flex h-40 items-center justify-center">
             <div className="flex items-center gap-2 text-[#949BA4]">
@@ -139,8 +214,60 @@ export default function CombinedHeatmap() {
             }}
             showWeekdayLabels
             style={{ color: "#949BA4" }}
+            renderBlock={(block, activity) =>
+              React.cloneElement(
+                block as React.ReactElement<
+                  React.SVGProps<SVGRectElement> & {
+                    "data-date"?: string;
+                    "data-count"?: string;
+                  }
+                >,
+                {
+                  // 各セルに日付とコミット数を埋め込む
+                  // hover時 event.target から直接読み取る
+                  "data-date": activity.date,
+                  "data-count": String(activity.count),
+                  style: { cursor: "pointer" },
+                },
+              )
+            }
           />
         )}
+      </div>
+
+      {/* フローティングツールチップ */}
+      <div
+        className="pointer-events-none absolute z-50 rounded-lg border border-[#30363d] shadow-xl"
+        style={{
+          left: tooltip.x,
+          top: tooltip.y - 6, // セルから少し上に浮かす
+          transform: "translate(-50%, -100%)", // 基準点をツールチップの中央下端にする
+          background: "#161b22",
+          padding: "8px 12px",
+          opacity: tooltip.visible && tooltip.date ? 1 : 0,
+          transition: "opacity 0.08s ease",
+          minWidth: "max-content", // コンテンツに合わせて幅を自動調整
+        }}
+      >
+        {/* 本家風の下向き三角形（しっぽ） */}
+        <div className="absolute -bottom-1.5 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-r border-b border-[#30363d] bg-[#161b22]" />
+
+        {/* ツールチップの中身 */}
+        <div className="relative z-10">
+          {tooltip.date && (
+            <>
+              <p className="text-[11px] text-[#8b949e]">{formatDate(tooltip.date)}</p>
+              {tooltip.count > 0 ? (
+                <p className="mt-0.5 text-sm font-bold">
+                  <span className="text-[#39d353]">{tooltip.count.toLocaleString()}</span>
+                  <span className="ml-1 text-xs font-normal text-[#8b949e]">コミット</span>
+                </p>
+              ) : (
+                <p className="mt-0.5 text-xs text-[#484f58]">コミットなし</p>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

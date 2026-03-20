@@ -276,9 +276,11 @@ export default function AiModelPieChart() {
         {/* ヘッダー */}
         <div className="mb-6 flex items-start justify-between">
           <div>
-            <h2 className="text-xl font-bold tracking-wider text-[#F2F3F5]">みんなの推しAI 🤖</h2>
+            <h2 className="text-xl font-bold tracking-wider text-[#F2F3F5]">
+              ❤ 推しAIの教え合い ❤
+            </h2>
             <p className="mt-0.5 text-xs text-[#636e7b]">
-              メンバーが一番使っているAIモデル・ツールの集計です
+              あなたが今一番おすすめするAIモデルを教えてください
             </p>
           </div>
           {/* 再選択中は戻るボタン */}
@@ -415,7 +417,7 @@ export default function AiModelPieChart() {
       <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         {" "}
         <div>
-          <h2 className="text-xl font-bold tracking-wider text-[#F2F3F5]">❤ 推しAI ❤</h2>
+          <h2 className="text-xl font-bold tracking-wider text-[#F2F3F5]">❤ 推しAIの教え合い ❤</h2>
           <p className="mt-0.5 text-xs text-[#636e7b]">
             メンバーが今1番おすすめするAIモデル（再選択可）
           </p>
