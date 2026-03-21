@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
+import Link from "next/link";
 
 export default async function PublicProfilePage({
   params,
@@ -24,6 +26,9 @@ export default async function PublicProfilePage({
     notFound();
   }
 
+  const session = await auth();
+  const isOwner = session?.user?.id === user.id;
+
   const displayName = user.nickname || user.githubName;
   const avatarUrl = user.avatarUrl || `https://github.com/${user.githubName}.png`;
 
@@ -40,14 +45,27 @@ export default async function PublicProfilePage({
             <div className="text-center sm:text-left">
               <h1 className="text-3xl font-bold text-white">{displayName}</h1>
               <p className="text-gray-400">@{user.githubName}</p>
-              <a
-                href={`https://github.com/${user.githubName}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-3 inline-block rounded-md bg-[#21262d] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#30363d]"
-              >
-                GitHubプロフィールを見る ↗
-              </a>
+
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-3 sm:justify-start">
+                <a
+                  href={`https://github.com/${user.githubName}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block rounded-md bg-[#21262d] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#30363d]"
+                >
+                  GitHubプロフィールを見る ↗
+                </a>
+
+                {/* isOwner（本人）の時だけリンクを出す */}
+                {isOwner && (
+                  <Link
+                    href="/mypage"
+                    className="inline-block rounded-md border border-blue-600/30 bg-blue-600/10 px-4 py-2 text-sm font-medium text-blue-400 transition hover:bg-blue-600/20"
+                  >
+                    プロフィールを編集
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
 
