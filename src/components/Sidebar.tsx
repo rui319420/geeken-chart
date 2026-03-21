@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import Image from "next/image";
 import SidebarShell from "@/components/SidebarShell";
-import Link from "next/link";
 
 type Member = {
   id: string;
@@ -16,7 +15,7 @@ function MemberRow({ member }: { member: Member }) {
   const initial = displayName.charAt(0).toUpperCase();
 
   return (
-    <Link
+    <a
       href={`https://github.com/${member.githubName}`}
       className="member-row flex h-10.5 cursor-pointer items-center gap-3 rounded-sm px-2"
       title={`@${member.githubName} — GitHubを開く`}
@@ -55,7 +54,7 @@ function MemberRow({ member }: { member: Member }) {
           </p>
         )}
       </div>
-    </Link>
+    </a>
   );
 }
 

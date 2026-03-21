@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { PLATFORMS } from "@/lib/constants";
 
 // 親コンポーネント(page.tsx)から受け取るデータの型定義
-type LinkData = { platform: string; url: string };
+type LinkData = { id?: string; platform: string; url: string };
 type UserData = {
   nickname: string | null;
   githubName: string;
@@ -20,7 +20,7 @@ export default function ProfileForm({ initialData }: { initialData: UserData }) 
   const [nickname, setNickname] = useState(initialData.nickname || "");
   const [links, setLinks] = useState<LinkData[]>(
     initialData.links.length > 0
-      ? initialData.links.map((l) => ({ platform: l.platform, url: l.url }))
+      ? initialData.links.map((l) => ({ id: l.id, platform: l.platform, url: l.url }))
       : [],
   );
 
@@ -53,7 +53,10 @@ export default function ProfileForm({ initialData }: { initialData: UserData }) 
       const res = await fetch("/api/user/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nickname, links: validLinks }),
+        body: JSON.stringify({
+          nickname,
+          links: validLinks.map((l) => ({ platform: l.platform, url: l.url })),
+        }),
       });
 
       if (!res.ok) throw new Error("Failed to update profile");
@@ -109,7 +112,7 @@ export default function ProfileForm({ initialData }: { initialData: UserData }) 
             <p className="text-sm text-gray-500">リンクは登録されていません。</p>
           ) : (
             links.map((link, index) => (
-              <div key={index} className="flex items-center gap-2">
+              <div key={link.id || crypto.randomUUID()} className="flex items-center gap-2">
                 <select
                   value={link.platform}
                   onChange={(e) => updateLink(index, "platform", e.target.value)}

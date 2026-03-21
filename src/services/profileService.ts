@@ -13,6 +13,7 @@ export async function updateUserProfile(userId: string, data: ProfileUpdateReque
       data: {
         nickname: data.nickname,
       },
+      include: { links: true },
     });
 
     // 古いリンクをすべて削除
