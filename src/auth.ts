@@ -35,6 +35,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if ("nickname" in user) {
           session.user.nickname = user.nickname;
         }
+        if ("githubName" in user) {
+          session.user.githubName = user.githubName as string;
+        }
       }
       return session;
     },
