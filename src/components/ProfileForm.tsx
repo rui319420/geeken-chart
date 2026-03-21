@@ -11,7 +11,7 @@ type UserData = {
   links: LinkData[];
 };
 
-const PLATFORMS = ["X", "ZENN", "QIITA", "PORTFOLIO", "OTHER"];
+const PLATFORMS = ["X", "Zenn", "Qiita", "Portfolio", "Other"];
 
 export default function ProfileForm({ initialData }: { initialData: UserData }) {
   const router = useRouter();
