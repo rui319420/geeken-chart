@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { PLATFORMS } from "@/lib/constants";
 
 // 親コンポーネント(page.tsx)から受け取るデータの型定義
-type LinkData = { id?: string; platform: string; url: string };
+type LinkData = { id?: string; localId?: string; platform: string; url: string };
 type UserData = {
   nickname: string | null;
   githubName: string;
@@ -20,14 +20,18 @@ export default function ProfileForm({ initialData }: { initialData: UserData }) 
   const [nickname, setNickname] = useState(initialData.nickname || "");
   const [links, setLinks] = useState<LinkData[]>(
     initialData.links.length > 0
-      ? initialData.links.map((l) => ({ id: l.id, platform: l.platform, url: l.url }))
+      ? initialData.links.map((l) => ({
+          id: l.id,
+          localId: crypto.randomUUID(),
+          platform: l.platform,
+          url: l.url,
+        }))
       : [],
   );
 
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  // リンクの追加・削除・更新ロジック
   const addLink = () => setLinks([...links, { platform: "X", url: "" }]);
 
   const removeLink = (index: number) => {
@@ -112,7 +116,7 @@ export default function ProfileForm({ initialData }: { initialData: UserData }) 
             <p className="text-sm text-gray-500">リンクは登録されていません。</p>
           ) : (
             links.map((link, index) => (
-              <div key={link.id || crypto.randomUUID()} className="flex items-center gap-2">
+              <div key={link.id || link.localId} className="flex items-center gap-2">
                 <select
                   value={link.platform}
                   onChange={(e) => updateLink(index, "platform", e.target.value)}
