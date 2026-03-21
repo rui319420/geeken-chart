@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 
 export type ProfileUpdateRequest = {
-  nickname?: string;
+  nickname?: string | null;
   links: { platform: string; url: string }[];
 };
 

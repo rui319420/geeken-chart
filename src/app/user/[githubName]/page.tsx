@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import Link from "next/link";
+import Image from "next/image";
 
 export default async function PublicProfilePage({
   params,
@@ -37,10 +38,12 @@ export default async function PublicProfilePage({
       <div className="container mx-auto max-w-3xl p-6">
         <div className="overflow-hidden rounded-xl border border-gray-800 bg-[#161b22] shadow-xl">
           <div className="flex flex-col items-center gap-6 border-b border-gray-800 p-8 sm:flex-row sm:items-start">
-            <img
+            <Image
               src={avatarUrl}
               alt={displayName}
-              className="h-24 w-24 rounded-full border-2 border-gray-700 shadow-lg"
+              width={96}
+              height={96}
+              className="h-24 w-24 rounded-full border-2 border-gray-700 object-cover shadow-lg"
             />
             <div className="text-center sm:text-left">
               <h1 className="text-3xl font-bold text-white">{displayName}</h1>

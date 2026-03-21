@@ -1,6 +1,22 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { updateUserProfile } from "@/services/profileService";
+import { z } from "zod";
+
+const profileSchema = z.object({
+  nickname: z.string().max(20, "ニックネームは20文字以内にしてください").nullable().optional(),
+  links: z
+    .array(
+      z.object({
+        platform: z.string(),
+        url: z
+          .string()
+          .url("正しいURL形式で入力してください")
+          .startsWith("https://", "URLはhttps://から始める必要があります"),
+      }),
+    )
+    .max(10, "リンクは最大10個までです"),
+});
 
 export async function PUT(request: Request) {
   try {
@@ -11,11 +27,20 @@ export async function PUT(request: Request) {
 
     const body = await request.json();
 
-    await updateUserProfile(session.user.id, body);
+    if (body.nickname === "") {
+      body.nickname = null;
+    }
 
-    return NextResponse.json({ message: "Profile updated successfully" });
+    const validatedData = profileSchema.parse(body);
+
+    const updatedUser = await updateUserProfile(session.user.id, validatedData);
+
+    return NextResponse.json(updatedUser);
   } catch (error) {
-    console.error("Failed to update profile:", error);
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: "Invalid data", details: error.issues }, { status: 400 });
+    }
+    console.error(error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
