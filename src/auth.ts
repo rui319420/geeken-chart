@@ -4,20 +4,14 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import { syncUserLanguages } from "@/services/userService";
 import { waitUntil } from "@vercel/functions";
+import { authConfig } from "@/auth.config";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  // authConfig の callbacks（jwt・session・authorized）と
+  // session strategy を継承しつつ、Prisma アダプターを追加する。
+  // ミドルウェアは authConfig を直接参照するため Prisma はエッジに混入しない。
+  ...authConfig,
   adapter: PrismaAdapter(prisma),
-  // ────────────────────────────────────────────────────────────────
-  // session strategy を "jwt" に設定する。
-  //
-  // Prisma アダプターのデフォルトは "database"（セッションをDBで管理）だが、
-  // "database" 戦略だとミドルウェアがセッション確認のたびに DB へアクセスし、
-  // Prisma クライアントがエッジバンドルに含まれて 1MB 制限を超える。
-  //
-  // "jwt" にすることでミドルウェアは署名済み JWT クッキーのみで
-  // セッションを検証できるようになり、エッジで Prisma を不要にできる。
-  // ────────────────────────────────────────────────────────────────
-  session: { strategy: "jwt" },
   providers: [
     GitHub({
       clientId: process.env.GITHUB_ID,
@@ -39,23 +33,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    async jwt({ token, user }) {
-      // サインイン直後のみ user が渡される。DB の id を token に保存する。
-      if (user) {
-        token.id = user.id;
-        token.nickname = (user as { nickname?: string | null }).nickname ?? null;
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id as string;
-        session.user.nickname = token.nickname as string | null | undefined;
-      }
-      return session;
-    },
-  },
   events: {
     async signIn({ user, account, profile }) {
       const userId = user.id;
