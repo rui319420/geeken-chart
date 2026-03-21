@@ -43,7 +43,7 @@ export const authConfig: NextAuthConfig = {
       return token;
     },
     async session({ session, token }) {
-      if (session.user) {
+      if (session.user && token?.id) {
         session.user.id = token.id as string;
         session.user.nickname = token.nickname as string | null | undefined;
       }
