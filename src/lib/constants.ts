@@ -34,7 +34,7 @@ export const PLATFORMS = ["X", "Zenn", "Qiita", "Portfolio", "Other"] as const;
 
 export const GITHUB_SCORE_WEIGHTS = {
   stars: 10,
-  commits: 5,
-  prs: 3,
-  issues: 1,
+  prs: 5,
+  issues: 3,
+  commits: 1,
 } as const;
