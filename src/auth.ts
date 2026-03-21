@@ -4,8 +4,13 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import { syncUserLanguages } from "@/services/userService";
 import { waitUntil } from "@vercel/functions";
+import { authConfig } from "@/auth.config";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  // authConfig の callbacks（jwt・session・authorized）と
+  // session strategy を継承しつつ、Prisma アダプターを追加する。
+  // ミドルウェアは authConfig を直接参照するため Prisma はエッジに混入しない。
+  ...authConfig,
   adapter: PrismaAdapter(prisma),
   providers: [
     GitHub({
@@ -28,25 +33,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    async session({ session, user }) {
-      if (session.user) {
-        session.user.id = user.id;
-        if ("nickname" in user) {
-          session.user.nickname = user.nickname;
-        }
-      }
-      return session;
-    },
-  },
   events: {
     async signIn({ user, account, profile }) {
       const userId = user.id;
-
       if (!userId || !profile) return;
 
       if (account?.provider === "github") {
-        // ユーザー情報とアクセストークンの更新
         await prisma.user.update({
           where: { id: userId },
           data: {
@@ -63,7 +55,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           });
         }
 
-        // ユーザー自身のトークンを取得
         const githubName = profile.login as string;
         const userToken = account.access_token;
         waitUntil(syncUserLanguages(userId, githubName, userToken).catch(console.error));

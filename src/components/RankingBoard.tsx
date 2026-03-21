@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { Star, GitCommit, GitPullRequest, CircleDot } from "lucide-react";
+import Image from "next/image";
 
 export default async function RankingBoard() {
   // ログイン中のユーザー情報を取得
@@ -27,13 +28,7 @@ export default async function RankingBoard() {
   });
 
   const top5Users = top5UsersRaw.map((user) => {
-    // 自分のスコアと同じスコアを持つ一番最初の人のインデックスを探し、それに+1する。
-    // 例: スコアが [100, 100, 90] の場合
-    // 1人目(100): 100が最初に出現するのはindex 0 -> 0 + 1 = 1位
-    // 2人目(100): 100が最初に出現するのはindex 0 -> 0 + 1 = 1位
-    // 3人目( 90):  90が最初に出現するのはindex 2 -> 2 + 1 = 3位
     const displayRank = top5UsersRaw.findIndex((u) => u.githubScore === user.githubScore) + 1;
-
     return { ...user, displayRank };
   });
 
@@ -42,7 +37,6 @@ export default async function RankingBoard() {
   let myData = null;
 
   if (currentUserId) {
-    // まず自分のデータを取得
     myData = await prisma.user.findUnique({
       where: { id: currentUserId },
       select: {
@@ -55,9 +49,7 @@ export default async function RankingBoard() {
       },
     });
 
-    // 自分がランキングに参加しており、スコアが0より大きい場合のみ順位を計算
     if (myData && myData.githubScore && myData.githubScore > 0) {
-      // 自分よりスコアが高い人の数をカウントする
       const higherScoreCount = await prisma.user.count({
         where: {
           joinRanking: true,
@@ -66,7 +58,7 @@ export default async function RankingBoard() {
       });
       myRank = higherScoreCount + 1;
     } else {
-      myData = null; // ランキング不参加の場合は表示しない
+      myData = null;
     }
   }
 
@@ -104,10 +96,11 @@ export default async function RankingBoard() {
                 {/* アイコンと名前 */}
                 <div className="flex items-center gap-3">
                   {user.avatarUrl && !user.isAnonymous ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    <Image
                       src={user.avatarUrl}
                       alt={user.githubName}
+                      width={32}
+                      height={32}
                       className="h-8 w-8 rounded-full border border-white/10"
                     />
                   ) : (
@@ -166,10 +159,11 @@ export default async function RankingBoard() {
               </div>
               <div className="flex items-center gap-3">
                 {myData.avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
+                  <Image
                     src={myData.avatarUrl}
                     alt={myData.githubName}
+                    width={32}
+                    height={32}
                     className="h-8 w-8 rounded-full border border-white/10"
                   />
                 ) : (

@@ -120,7 +120,10 @@ export default function CombinedHeatmap() {
   }, []);
 
   return (
-    <div className="flex w-full flex-col rounded-xl border border-[#2ea043]/40 bg-[#0d1117] p-6 shadow-[0_0_20px_rgba(46,160,67,0.15)]">
+    <div
+      ref={containerRef}
+      className="relative flex w-full flex-col rounded-xl border border-[#2ea043]/40 bg-[#0d1117] p-6 shadow-[0_0_20px_rgba(46,160,67,0.15)]"
+    >
       {/* ヘッダー */}
       <div className="mb-5 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
         <div>
