@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { PLATFORMS } from "@/lib/constants";
 
 // 親コンポーネント(page.tsx)から受け取るデータの型定義
 type LinkData = { platform: string; url: string };
@@ -10,8 +11,6 @@ type UserData = {
   githubName: string;
   links: LinkData[];
 };
-
-const PLATFORMS = ["X", "Zenn", "Qiita", "Portfolio", "Other"];
 
 export default function ProfileForm({ initialData }: { initialData: UserData }) {
   const router = useRouter();

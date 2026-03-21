@@ -30,6 +30,10 @@ export default async function PublicProfilePage({
   const session = await auth();
   const isOwner = session?.user?.id === user.id;
 
+  if (user.isAnonymous && !isOwner) {
+    notFound();
+  }
+
   const displayName = user.nickname || user.githubName;
   const avatarUrl = user.avatarUrl || `https://github.com/${user.githubName}.png`;
 

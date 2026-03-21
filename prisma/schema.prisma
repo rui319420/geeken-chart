@@ -19,7 +19,7 @@ model User {
   id            String    @id @default(cuid())
   name          String?
   githubId      String    @unique
-  githubName    String
+  githubName    String    @unique
   nickname      String?
   avatarUrl     String?
   email         String?   @unique

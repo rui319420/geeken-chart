@@ -2,13 +2,16 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { updateUserProfile } from "@/services/profileService";
 import { z } from "zod";
+import { PLATFORMS } from "@/lib/constants";
 
 const profileSchema = z.object({
   nickname: z.string().max(20, "ニックネームは20文字以内にしてください").nullable().optional(),
   links: z
     .array(
       z.object({
-        platform: z.string(),
+        platform: z.enum(PLATFORMS, {
+          message: "無効なプラットフォームです",
+        }),
         url: z
           .string()
           .url("正しいURL形式で入力してください")
