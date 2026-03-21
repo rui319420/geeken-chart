@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import Image from "next/image";
 import Header from "@/components/Header";
 import RadioNav from "@/components/RadioNav";
+import Link from "next/link";
 
 type Member = {
   id: string;
@@ -22,10 +23,8 @@ function MemberCard({ member }: { member: Member }) {
   const hasDiscord = !!member.discordId;
 
   return (
-    <a
-      href={`https://github.com/${member.githubName}`}
-      target="_blank"
-      rel="noopener noreferrer"
+    <Link
+      href={`/user/${member.githubName}`}
       className="member-card group flex items-center gap-3 rounded-md px-3 py-2 transition-colors duration-150"
       style={{ borderRadius: "6px" }}
     >
@@ -52,12 +51,12 @@ function MemberCard({ member }: { member: Member }) {
       {/* テキスト */}
       <div className="min-w-0 flex-1">
         <p
-          className="member-name truncate text-[14px] leading-[18px] font-medium"
+          className="member-name truncate text-[14px] leading-4.5 font-medium"
           style={{ color: "#c9d1d9" }}
         >
           {displayName}
         </p>
-        <p className="truncate text-[11px] leading-[14px]" style={{ color: "#636e7b" }}>
+        <p className="truncate text-[11px] leading-3.5" style={{ color: "#636e7b" }}>
           @{member.githubName}
           {hasDiscord && (
             <span className="ml-1.5" style={{ color: "#818cf8" }}>
@@ -73,7 +72,7 @@ function MemberCard({ member }: { member: Member }) {
           {member.githubScore.toLocaleString()} pts
         </span>
       )}
-    </a>
+    </Link>
   );
 }
 
