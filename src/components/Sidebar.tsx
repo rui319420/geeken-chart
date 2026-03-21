@@ -17,9 +17,7 @@ function MemberRow({ member }: { member: Member }) {
   return (
     <a
       href={`https://github.com/${member.githubName}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="member-row flex h-[42px] cursor-pointer items-center gap-3 rounded-[4px] px-2"
+      className="member-row flex h-10.5 cursor-pointer items-center gap-3 rounded-sm px-2"
       title={`@${member.githubName} — GitHubを開く`}
     >
       {/* Avatar */}
@@ -45,13 +43,13 @@ function MemberRow({ member }: { member: Member }) {
       {/* テキスト */}
       <div className="min-w-0 flex-1">
         <p
-          className="member-name truncate text-[15px] leading-[18px] font-medium"
+          className="member-name truncate text-[15px] leading-4.5 font-medium"
           style={{ color: "#949ba4" }}
         >
           {displayName}
         </p>
         {member.nickname && (
-          <p className="truncate text-[11px] leading-[14px]" style={{ color: "#616269" }}>
+          <p className="truncate text-[11px] leading-3.5" style={{ color: "#616269" }}>
             @{member.githubName}
           </p>
         )}
