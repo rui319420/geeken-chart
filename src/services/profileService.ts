@@ -34,3 +34,16 @@ export async function updateUserProfile(userId: string, data: ProfileUpdateReque
     return updatedUser;
   });
 }
+
+export async function getUserProfile(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      links: true,
+    },
+  });
+
+  if (!user) throw new Error("User not found");
+
+  return user;
+}
