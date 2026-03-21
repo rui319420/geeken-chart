@@ -143,7 +143,9 @@ async function fetchTotalStars(username: string, token: string): Promise<number>
       throw new Error(`GitHub user not found: ${username}`);
     }
 
-    const { nodes, pageInfo } = data.user.repositories;
+    const nodes: { stargazerCount: number }[] = data.user.repositories.nodes;
+    const pageInfo: { hasNextPage: boolean; endCursor: string | null } =
+      data.user.repositories.pageInfo;
 
     totalStars += nodes.reduce((sum, repo) => sum + repo.stargazerCount, 0);
 
