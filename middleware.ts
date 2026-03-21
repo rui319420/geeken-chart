@@ -1,8 +1,5 @@
 import { auth } from "@/auth";
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
 
-// 認証が必要なパス（ここに追加するだけで保護される）
 const PROTECTED_PATHS = [
   "/ranking",
   "/frameworks",
@@ -13,24 +10,23 @@ const PROTECTED_PATHS = [
   "/sns",
 ];
 
-export async function middleware(request: NextRequest) {
+// auth() を await で呼び出すのではなく、NextAuth v5 のミドルウェア形式で使う。
+// こうすることで Prisma アダプターがエッジバンドルに含まれなくなり、
+// 1MB のサイズ制限を回避できる。
+// セッション確認は JWT クッキーの検証のみで完結するため軽量。
+export default auth((request) => {
   const { pathname } = request.nextUrl;
 
   const isProtected = PROTECTED_PATHS.some(
     (path) => pathname === path || pathname.startsWith(`${path}/`),
   );
-  if (!isProtected) return NextResponse.next();
 
-  const session = await auth();
-  if (!session) {
+  if (isProtected && !request.auth) {
     const loginUrl = new URL("/", request.url);
-    return NextResponse.redirect(loginUrl);
+    return Response.redirect(loginUrl);
   }
-
-  return NextResponse.next();
-}
+});
 
 export const config = {
-  // _next/static, _next/image, favicon などは除外
   matcher: ["/((?!_next/static|_next/image|favicon.ico|api).*)"],
 };
