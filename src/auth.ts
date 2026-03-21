@@ -33,20 +33,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    async session({ session, user }) {
-      if (session.user) {
-        session.user.id = user.id;
-        if ("nickname" in user) {
-          session.user.nickname = user.nickname;
-        }
-        if ("githubName" in user) {
-          session.user.githubName = user.githubName as string;
-        }
-      }
-      return session;
-    },
-  },
   events: {
     async signIn({ user, account, profile }) {
       const userId = user.id;
