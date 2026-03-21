@@ -31,3 +31,10 @@ export function getRandomColor(seed: string): string {
 }
 
 export const PLATFORMS = ["X", "Zenn", "Qiita", "Portfolio", "Other"] as const;
+
+export const GITHUB_SCORE_WEIGHTS = {
+  stars: 10,
+  commits: 5,
+  prs: 3,
+  issues: 1,
+} as const;
