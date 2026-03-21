@@ -45,6 +45,7 @@ model User {
   snapshots       LanguageSnapshot[]
   discordActivity DiscordActivity[]
   discordId       String?            @unique
+  links           UserLink[]
 
   // ランキング用 GitHub Stats データ
   githubScore    Int?
@@ -183,4 +184,15 @@ model SurveyResponse {
 
   @@unique([userId, category])
   @@index([category, answer])
+}
+
+model UserLink {
+  id        String   @id @default(cuid())
+  userId    String
+  platform  String   // "X", "ZENN", "QIITA", "PORTFOLIO", "OTHER" など
+  url       String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
