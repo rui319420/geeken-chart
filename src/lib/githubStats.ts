@@ -1,3 +1,5 @@
+import { GITHUB_SCORE_WEIGHTS } from "@/lib/constants";
+
 // GraphQLのレスポンスの型定義
 export interface GitHubStatsResponse {
   totalStars: number;
@@ -199,6 +201,9 @@ export async function fetchUserGitHubStats(
  */
 export function calculateGitHubScore(stats: GitHubStatsResponse): number {
   return (
-    stats.totalStars * 10 + stats.totalPRs * 5 + stats.totalIssues * 3 + stats.totalCommits * 1
+    stats.totalStars * GITHUB_SCORE_WEIGHTS.stars +
+    stats.totalPRs * GITHUB_SCORE_WEIGHTS.prs +
+    stats.totalIssues * GITHUB_SCORE_WEIGHTS.issues +
+    stats.totalCommits * GITHUB_SCORE_WEIGHTS.commits
   );
 }

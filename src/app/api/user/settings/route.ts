@@ -9,7 +9,6 @@ interface SettingsBody {
   showLanguages?: boolean;
   joinRanking?: boolean;
   isAnonymous?: boolean;
-  nickname?: string;
   excludedLanguages?: string[];
 }
 
@@ -19,7 +18,6 @@ const userSettingsSelect = {
   showLanguages: true,
   joinRanking: true,
   isAnonymous: true,
-  nickname: true,
   excludedLanguages: true,
 };
 
@@ -31,18 +29,6 @@ export async function PATCH(request: Request) {
 
   const body = await request.json();
   const data: Partial<SettingsBody> = {};
-
-  // ニックネームの処理
-  if (typeof body.nickname === "string") {
-    const trimmedNickname = body.nickname.trim();
-    if (trimmedNickname.length > 20) {
-      return NextResponse.json(
-        { error: "ニックネームは20文字以内で入力してください" },
-        { status: 400 },
-      );
-    }
-    data.nickname = trimmedNickname;
-  }
 
   if (Array.isArray(body.excludedLanguages)) {
     const isValidArray = body.excludedLanguages.every((item: unknown) => typeof item === "string");

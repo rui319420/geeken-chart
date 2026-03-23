@@ -39,13 +39,15 @@ export const authConfig: NextAuthConfig = {
       if (user) {
         token.id = user.id;
         token.nickname = (user as { nickname?: string | null }).nickname ?? null;
+        token.githubName = (user as { githubName?: string }).githubName ?? null;
       }
       return token;
     },
     async session({ session, token }) {
-      if (session.user) {
+      if (session.user && token?.id) {
         session.user.id = token.id as string;
         session.user.nickname = token.nickname as string | null | undefined;
+        session.user.githubName = token.githubName as string;
       }
       return session;
     },

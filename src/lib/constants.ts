@@ -29,3 +29,12 @@ export function getRandomColor(seed: string): string {
   const color = Math.floor(Math.abs(((Math.sin(hash) * 10000) % 1) * 16777215)).toString(16);
   return "#" + "000000".substring(0, 6 - color.length) + color;
 }
+
+export const PLATFORMS = ["X", "Zenn", "Qiita", "Portfolio", "Other"] as const;
+
+export const GITHUB_SCORE_WEIGHTS = {
+  stars: 10,
+  prs: 5,
+  issues: 3,
+  commits: 1,
+} as const;

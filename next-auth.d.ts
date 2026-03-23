@@ -5,6 +5,7 @@ declare module "next-auth" {
     user: {
       id: string;
       nickname?: string | null;
+      githubName: string;
     } & DefaultSession["user"];
   }
 

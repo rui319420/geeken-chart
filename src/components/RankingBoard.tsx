@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { Star, GitCommit, GitPullRequest, CircleDot } from "lucide-react";
+import Link from "next/link";
 import Image from "next/image";
 
 export default async function RankingBoard() {
@@ -80,11 +81,8 @@ export default async function RankingBoard() {
                   ? "text-orange-400"
                   : "text-[#8b949e]";
 
-          return (
-            <li
-              key={user.id}
-              className="group flex items-center justify-between rounded-lg border border-white/5 bg-white/2 p-4 transition-all duration-200 hover:border-white/10 hover:bg-white/4"
-            >
+          const innerContent = (
+            <>
               <div className="flex items-center gap-4">
                 {/* 順位バッジ */}
                 <div
@@ -138,6 +136,26 @@ export default async function RankingBoard() {
                 <span className="text-lg font-bold text-[#39d353]">{user.githubScore}</span>
                 <span className="pb-0.5 text-xs text-[#8b949e]">pts</span>
               </div>
+            </>
+          );
+
+          // 匿名かどうかで <div> か <Link> かを切り替える
+          return (
+            <li key={user.id} className="block">
+              {user.isAnonymous ? (
+                // 匿名ユーザーの場合はクリックできないただの枠にする
+                <div className="group flex items-center justify-between rounded-lg border border-white/5 bg-white/2 p-4 transition-all duration-200">
+                  {innerContent}
+                </div>
+              ) : (
+                // 通常ユーザーの場合はマイページへのリンクにする
+                <Link
+                  href={`/user/${user.githubName}`}
+                  className="group flex items-center justify-between rounded-lg border border-white/5 bg-white/2 p-4 transition-all duration-200 hover:border-white/10 hover:bg-white/4"
+                >
+                  {innerContent}
+                </Link>
+              )}
             </li>
           );
         })}
