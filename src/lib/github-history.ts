@@ -1,5 +1,4 @@
 const GITHUB_API = "https://api.github.com";
-const TOP_LANGUAGES = 5;
 
 const EXCLUDED_LANGUAGES = new Set(["ShaderLab", "HLSL", "GLSL", "Jupyter Notebook"]);
 
@@ -39,17 +38,11 @@ export async function buildHistoricalSnapshots(
     cachedLanguages,
   } = options;
 
-  // ──────────────────────────────────────────────────────────────
-  // 1. リポジトリ一覧（キャッシュがあればそれを使う）
-  // ──────────────────────────────────────────────────────────────
   const repos =
     cachedRepos ?? (await fetchAllRepos(githubName, token, includeForks, includePrivate));
 
   if (repos.length === 0) return [];
 
-  // ──────────────────────────────────────────────────────────────
-  // 2. 言語データ（キャッシュがあれば API 呼び出しをスキップ）
-  // ──────────────────────────────────────────────────────────────
   const repoLanguages: { repo: GithubRepo; langBytes: LanguageBytes }[] = cachedLanguages
     ? repos.map((repo) => ({
         repo,
@@ -57,14 +50,8 @@ export async function buildHistoricalSnapshots(
       }))
     : await fetchLanguagesWithConcurrency(githubName, repos, token, concurrency);
 
-  // ──────────────────────────────────────────────────────────────
-  // 3. 月リストを生成（古い順）
-  // ──────────────────────────────────────────────────────────────
   const months = getRecentMonths(monthsBack);
 
-  // ──────────────────────────────────────────────────────────────
-  // 4. 各月末時点で存在していたリポジトリを使って言語bytesを合算
-  // ──────────────────────────────────────────────────────────────
   const snapshots: MonthlySnapshot[] = months.map((month) => {
     const monthEnd = getMonthEnd(month);
     const languages: Record<string, number> = {};
@@ -85,38 +72,9 @@ export async function buildHistoricalSnapshots(
   return snapshots.filter((s) => Object.keys(s.languages).length > 0);
 }
 
-export function toTrendDataPoints(
-  snapshots: MonthlySnapshot[],
-): { month: string; [lang: string]: string | number }[] {
-  if (snapshots.length === 0) return [];
-
-  const totals: Record<string, number> = {};
-  for (const { languages } of snapshots) {
-    for (const [lang, bytes] of Object.entries(languages)) {
-      totals[lang] = (totals[lang] ?? 0) + bytes;
-    }
-  }
-  const topLangs = Object.entries(totals)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, TOP_LANGUAGES)
-    .map(([lang]) => lang);
-
-  return snapshots.map(({ month, languages }) => {
-    const total = Object.values(languages).reduce((s, b) => s + b, 0);
-    const point: { month: string; [lang: string]: string | number } = {
-      month: formatMonth(month),
-    };
-    for (const lang of topLangs) {
-      const bytes = languages[lang] ?? 0;
-      point[lang] = total > 0 ? Math.round((bytes / total) * 1000) / 10 : 0;
-    }
-    return point;
-  });
-}
-
-// ──────────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────────
 // 内部ユーティリティ
-// ──────────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────────
 
 async function fetchAllRepos(
   githubName: string,
@@ -203,9 +161,4 @@ function getRecentMonths(n: number): string[] {
 function getMonthEnd(yyyyMM: string): Date {
   const [y, m] = yyyyMM.split("-").map(Number);
   return new Date(y, m, 0, 23, 59, 59, 999);
-}
-
-function formatMonth(yyyyMM: string): string {
-  const [y, m] = yyyyMM.split("-");
-  return `${y}/${parseInt(m, 10)}`;
 }
