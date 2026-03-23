@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
+// ---- 型・定数（変更なし） ----------------------------------------
 interface FrameworkData {
   framework: string;
   ecosystem: string;
@@ -12,6 +13,9 @@ interface FrameworkData {
 
 type Category = "frontend" | "backend" | "fullstack" | "data/ml" | "infra/tool" | "other";
 type SortKey = "popular" | "category" | "name";
+
+// CATEGORY_MAP, CATEGORY_ORDER, CATEGORY_COLORS, CATEGORY_LABELS は
+// 元ファイルのまま（省略）
 
 const CATEGORY_MAP: Record<string, Category> = {
   React: "frontend",
@@ -204,17 +208,29 @@ const SORT_LABELS: Record<SortKey, string> = {
   name: "名前順",
 };
 
+const ALL_CATEGORIES = CATEGORY_ORDER;
+
 function getCategory(framework: string): Category {
   return CATEGORY_MAP[framework] ?? "other";
 }
-
-const ALL_CATEGORIES = CATEGORY_ORDER;
 
 export default function FrameworkChart() {
   const [data, setData] = useState<FrameworkData[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategories, setActiveCategories] = useState<Set<Category>>(new Set(ALL_CATEGORIES));
   const [sortKey, setSortKey] = useState<SortKey>("popular");
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+
+    handleResize();
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   useEffect(() => {
     fetch("/api/frameworks/all")
@@ -235,7 +251,6 @@ export default function FrameworkChart() {
 
   const sorted = useMemo(() => {
     const filtered = data.filter((d) => activeCategories.has(getCategory(d.framework)));
-
     switch (sortKey) {
       case "popular":
         return [...filtered].sort((a, b) => b.totalRepos - a.totalRepos).slice(0, 20);
@@ -257,20 +272,26 @@ export default function FrameworkChart() {
 
   const chartHeight = Math.max(sorted.length * 36 + 40, 160);
 
+  // レスポンシブなマージン計算
+  // YAxisのフレームワーク名は英語なので最大約130px, モバイルでは80pxに縮小
+  const yAxisWidth = isMobile ? 80 : 110;
+  const rightMargin = isMobile ? 24 : 48;
+
   return (
-    <div className="w-full rounded-xl border border-[#2ea043]/40 bg-[#0d1117] p-5 shadow-[0_0_20px_rgba(46,160,67,0.15)]">
+    <div className="w-full rounded-xl border border-[#2ea043]/40 bg-[#0d1117] p-4 shadow-[0_0_20px_rgba(46,160,67,0.15)] sm:p-5">
       <h3 className="mb-1 text-base font-bold text-[#e6edf3]">使用フレームワーク（全体）</h3>
 
       {/* ソート + カテゴリフィルター */}
       <div className="mb-5 flex flex-col gap-3">
-        <div className="flex items-center gap-2">
+        {/* ソート */}
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-[#636e7b]">並び替え</span>
           <div className="flex rounded-lg bg-[#161b22] p-1">
             {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
               <button
                 key={key}
                 onClick={() => setSortKey(key)}
-                className="rounded-md px-3 py-1 text-xs font-medium transition-all duration-150"
+                className="rounded-md px-2 py-1 text-xs font-medium transition-all duration-150 sm:px-3"
                 style={{
                   background: sortKey === key ? "rgba(46,160,67,0.2)" : "transparent",
                   color: sortKey === key ? "#3fb950" : "#636e7b",
@@ -284,15 +305,16 @@ export default function FrameworkChart() {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <span className="text-xs text-[#636e7b]">絞り込み</span>
+        {/* カテゴリフィルター */}
+        <div className="flex flex-wrap gap-1.5">
+          <span className="self-center text-xs text-[#636e7b]">絞り込み</span>
           {ALL_CATEGORIES.map((cat) => {
             const active = activeCategories.has(cat);
             return (
               <button
                 key={cat}
                 onClick={() => toggleCategory(cat)}
-                className="flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-all duration-150"
+                className="flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] transition-all duration-150 sm:gap-1.5 sm:px-3"
                 style={{
                   borderColor: active ? CATEGORY_COLORS[cat] : "#30363d",
                   background: active ? `${CATEGORY_COLORS[cat]}22` : "transparent",
@@ -303,7 +325,21 @@ export default function FrameworkChart() {
                   className="inline-block h-2 w-2 rounded-full"
                   style={{ background: active ? CATEGORY_COLORS[cat] : "#636e7b" }}
                 />
-                {CATEGORY_LABELS[cat]}
+                {/* モバイルは短縮ラベル */}
+                <span className="hidden sm:inline">{CATEGORY_LABELS[cat]}</span>
+                <span className="sm:hidden">
+                  {cat === "frontend"
+                    ? "FE"
+                    : cat === "backend"
+                      ? "BE"
+                      : cat === "fullstack"
+                        ? "FS"
+                        : cat === "data/ml"
+                          ? "ML"
+                          : cat === "infra/tool"
+                            ? "Infra"
+                            : "他"}
+                </span>
               </button>
             );
           })}
@@ -336,7 +372,7 @@ export default function FrameworkChart() {
           <BarChart
             data={sorted}
             layout="vertical"
-            margin={{ top: 0, right: 48, left: 100, bottom: 10 }}
+            margin={{ top: 0, right: rightMargin, left: yAxisWidth, bottom: 10 }}
           >
             <XAxis
               type="number"
@@ -355,10 +391,10 @@ export default function FrameworkChart() {
             <YAxis
               type="category"
               dataKey="framework"
-              tick={{ fill: "#e6edf3", fontSize: 12 }}
+              tick={{ fill: "#e6edf3", fontSize: 11 }}
               tickLine={false}
               axisLine={false}
-              width={96}
+              width={yAxisWidth}
             />
             <Tooltip
               cursor={{ fill: "rgba(255,255,255,0.04)" }}

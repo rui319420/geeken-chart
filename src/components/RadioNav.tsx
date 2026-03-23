@@ -12,7 +12,8 @@ interface NavItemProps {
   children: React.ReactNode;
 }
 
-function NavItem({ href, label, children }: NavItemProps) {
+// デスクトップ用サイドバーアイテム
+function SideNavItem({ href, label, children }: NavItemProps) {
   const pathname = usePathname();
   const active = pathname === href;
 
@@ -32,6 +33,30 @@ function NavItem({ href, label, children }: NavItemProps) {
   );
 }
 
+// モバイル用ボトムナビアイテム
+function BottomNavItem({ href, label, children }: NavItemProps) {
+  const pathname = usePathname();
+  const active = pathname === href;
+
+  return (
+    <Link
+      href={href}
+      className={`flex flex-1 flex-col items-center justify-center gap-1 py-2 transition-colors duration-150 ${
+        active ? "text-white" : "text-[#636e7b]"
+      }`}
+    >
+      <span
+        className={`flex h-6 w-6 items-center justify-center transition-colors ${
+          active ? "text-white" : "text-[#636e7b]"
+        }`}
+      >
+        {children}
+      </span>
+      <span className="text-[9px] leading-none font-medium">{label}</span>
+    </Link>
+  );
+}
+
 function Divider() {
   return (
     <div className="mx-3 my-1" style={{ height: "1px", background: "rgba(255,255,255,0.06)" }} />
@@ -47,6 +72,95 @@ function SectionLabel({ label }: { label: string }) {
     </div>
   );
 }
+
+// 共通のナビゲーション定義
+const mainNavItems = [
+  {
+    href: "/",
+    label: "ダッシュボード",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M4 13h6a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1zm-1 7a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v4zm10 0a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-7a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v7zm1-10h6a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/ranking",
+    label: "ランキング",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M2 19h20v2H2zM2 6l5 5.5L12 3l5 8.5L22 6v11H2z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/frameworks",
+    label: "フレームワーク",
+    icon: (
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <polyline points="16 18 22 12 16 6" />
+        <polyline points="8 6 2 12 8 18" />
+      </svg>
+    ),
+  },
+  {
+    href: "/members",
+    label: "メンバー",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2a5 5 0 1 0 5 5 5 5 0 0 0-5-5zm0 8a3 3 0 1 1 3-3 3 3 0 0 1-3 3zm9 11v-1a7 7 0 0 0-7-7h-4a7 7 0 0 0-7 7v1h2v-1a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v1z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/survey",
+    label: "アンケート",
+    icon: (
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M9 11l3 3L22 4" />
+        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+      </svg>
+    ),
+  },
+];
+
+const settingsNavItem = {
+  href: "/settings",
+  label: "設定",
+  icon: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 16c2.206 0 4-1.794 4-4s-1.794-4-4-4-4 1.794-4 4 1.794 4 4 4zm0-6c1.084 0 2 .916 2 2s-.916 2-2 2-2-.916-2-2 .916-2 2-2z" />
+      <path d="m2.845 16.136 1 1.73c.531.917 1.809 1.261 2.73.73l.529-.306A8.1 8.1 0 0 0 9 19.402V20c0 1.103.897 2 2 2h2c1.103 0 2-.897 2-2v-.598a8.132 8.132 0 0 0 1.896-1.111l.529.306c.923.53 2.198.188 2.731-.731l.999-1.729a2.001 2.001 0 0 0-.731-2.732l-.505-.292a7.718 7.718 0 0 0 0-2.224l.505-.292a2.002 2.002 0 0 0 .731-2.732l-.999-1.729c-.531-.92-1.808-1.265-2.731-.732l-.529.306A8.1 8.1 0 0 0 15 4.598V4c0-1.103-.897-2-2-2h-2c-1.103 0-2 .897-2 2v.598a8.132 8.132 0 0 0-1.896 1.111l-.529-.306c-.924-.531-2.2-.187-2.731.732l-.999 1.729a2.001 2.001 0 0 0 .731 2.732l.505.292a7.683 7.683 0 0 0 0 2.223l-.505.292a2.003 2.003 0 0 0-.731 2.733z" />
+    </svg>
+  ),
+};
+
+// モバイルボトムナビに表示する5項目（ダッシュボード・ランキング・メンバー・アンケート・設定）
+const mobileBottomItems = [
+  mainNavItems[0], // ダッシュボード
+  mainNavItems[1], // ランキング
+  mainNavItems[3], // メンバー
+  mainNavItems[4], // アンケート
+  settingsNavItem, // 設定
+];
 
 export default function RadioNav() {
   return (
@@ -75,6 +189,7 @@ export default function RadioNav() {
         .nav-item svg { flex-shrink: 0; }
       `}</style>
 
+      {/* ─── デスクトップ: サイドバー (lg+) ─── */}
       <nav
         className="supabase-nav fixed top-0 bottom-0 left-0 z-50 hidden flex-col lg:flex"
         style={{ background: "#161b22", borderRight: "1px solid rgba(255,255,255,0.06)" }}
@@ -94,64 +209,17 @@ export default function RadioNav() {
 
         {/* メインメニュー */}
         <div className="flex flex-1 flex-col gap-0.5 overflow-x-hidden overflow-y-auto px-2 py-3">
-          <NavItem href="/" label="ダッシュボード">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M4 13h6a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1zm-1 7a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v4zm10 0a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-7a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v7zm1-10h6a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1z" />
-            </svg>
-          </NavItem>
-
-          <Divider />
-
-          {/* ランキング・フレームワーク・メンバー・アンケート を同じグループに */}
-          <NavItem href="/ranking" label="ランキング">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M2 19h20v2H2zM2 6l5 5.5L12 3l5 8.5L22 6v11H2z" />
-            </svg>
-          </NavItem>
-
-          <NavItem href="/frameworks" label="フレームワーク">
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <polyline points="16 18 22 12 16 6" />
-              <polyline points="8 6 2 12 8 18" />
-            </svg>
-          </NavItem>
-
-          <NavItem href="/members" label="メンバー">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2a5 5 0 1 0 5 5 5 5 0 0 0-5-5zm0 8a3 3 0 1 1 3-3 3 3 0 0 1-3 3zm9 11v-1a7 7 0 0 0-7-7h-4a7 7 0 0 0-7 7v1h2v-1a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v1z" />
-            </svg>
-          </NavItem>
-
-          <NavItem href="/survey" label="アンケート">
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M9 11l3 3L22 4" />
-              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-            </svg>
-          </NavItem>
+          {mainNavItems.map((item) => (
+            <SideNavItem key={item.href} href={item.href} label={item.label}>
+              {item.icon}
+            </SideNavItem>
+          ))}
 
           <Divider />
 
           <SectionLabel label="技研" />
 
-          <NavItem href="/works" label="制作物">
+          <SideNavItem href="/works" label="制作物">
             <svg
               width="18"
               height="18"
@@ -166,9 +234,9 @@ export default function RadioNav() {
               <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
               <line x1="12" y1="22.08" x2="12" y2="12" />
             </svg>
-          </NavItem>
+          </SideNavItem>
 
-          <NavItem href="/sns" label="SNS">
+          <SideNavItem href="/sns" label="SNS">
             <svg
               width="18"
               height="18"
@@ -185,7 +253,7 @@ export default function RadioNav() {
               <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
               <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
             </svg>
-          </NavItem>
+          </SideNavItem>
         </div>
 
         {/* ボトム固定 — 設定 */}
@@ -193,13 +261,26 @@ export default function RadioNav() {
           className="shrink-0 px-2 py-3"
           style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
         >
-          <NavItem href="/settings" label="設定">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 16c2.206 0 4-1.794 4-4s-1.794-4-4-4-4 1.794-4 4 1.794 4 4 4zm0-6c1.084 0 2 .916 2 2s-.916 2-2 2-2-.916-2-2 .916-2 2-2z" />
-              <path d="m2.845 16.136 1 1.73c.531.917 1.809 1.261 2.73.73l.529-.306A8.1 8.1 0 0 0 9 19.402V20c0 1.103.897 2 2 2h2c1.103 0 2-.897 2-2v-.598a8.132 8.132 0 0 0 1.896-1.111l.529.306c.923.53 2.198.188 2.731-.731l.999-1.729a2.001 2.001 0 0 0-.731-2.732l-.505-.292a7.718 7.718 0 0 0 0-2.224l.505-.292a2.002 2.002 0 0 0 .731-2.732l-.999-1.729c-.531-.92-1.808-1.265-2.731-.732l-.529.306A8.1 8.1 0 0 0 15 4.598V4c0-1.103-.897-2-2-2h-2c-1.103 0-2 .897-2 2v.598a8.132 8.132 0 0 0-1.896 1.111l-.529-.306c-.924-.531-2.2-.187-2.731.732l-.999 1.729a2.001 2.001 0 0 0 .731 2.732l.505.292a7.683 7.683 0 0 0 0 2.223l-.505.292a2.003 2.003 0 0 0-.731 2.733z" />
-            </svg>
-          </NavItem>
+          <SideNavItem href={settingsNavItem.href} label={settingsNavItem.label}>
+            {settingsNavItem.icon}
+          </SideNavItem>
         </div>
+      </nav>
+
+      {/* ─── モバイル: ボトムナビ (〜lg) ─── */}
+      <nav
+        className="fixed right-0 bottom-0 left-0 z-50 flex lg:hidden"
+        style={{
+          background: "#161b22",
+          borderTop: "1px solid rgba(255,255,255,0.08)",
+          paddingBottom: "env(safe-area-inset-bottom)",
+        }}
+      >
+        {mobileBottomItems.map((item) => (
+          <BottomNavItem key={item.href} href={item.href} label={item.label}>
+            {item.icon}
+          </BottomNavItem>
+        ))}
       </nav>
     </>
   );

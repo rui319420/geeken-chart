@@ -3,7 +3,8 @@
 import { useEffect, useState, useRef } from "react";
 
 const DAY_LABELS = ["月", "火", "水", "木", "金", "土", "日"];
-const HOUR_TICKS = [0, 3, 6, 9, 12, 15, 18, 21, 24];
+const HOUR_TICKS = [0, 6, 12, 18, 24];
+const HOUR_TICKS_DESKTOP = [0, 3, 6, 9, 12, 15, 18, 21, 24];
 
 type Week = "current" | "last";
 
@@ -21,10 +22,7 @@ function getCellStyle(value: number): { background: string; boxShadow: string } 
   if (value < 0.65)
     return { background: "rgba(79, 149, 255, 0.68)", boxShadow: "0 0 6px rgba(79,149,255,0.3)" };
   if (value < 0.82)
-    return {
-      background: "rgba(100, 160, 255, 0.85)",
-      boxShadow: "0 0 10px rgba(100,160,255,0.4)",
-    };
+    return { background: "rgba(100, 160, 255, 0.85)", boxShadow: "0 0 10px rgba(100,160,255,0.4)" };
   return { background: "rgba(130, 180, 255, 1.0)", boxShadow: "0 0 16px rgba(130,180,255,0.6)" };
 }
 
@@ -59,12 +57,10 @@ export default function DiscordHeatmap() {
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 80);
     fetchWeek("current");
-
     const timer = setInterval(() => {
       const d = new Date();
       setNow({ day: (d.getDay() + 6) % 7, hour: d.getHours() });
     }, 60000);
-
     return () => {
       clearTimeout(t);
       clearInterval(timer);
@@ -88,7 +84,7 @@ export default function DiscordHeatmap() {
         background: "#0d1117",
         border: "1px solid rgba(88, 101, 242, 0.25)",
         borderRadius: 12,
-        padding: "16px 20px 14px",
+        padding: "16px 16px 14px",
         width: "100%",
         opacity: visible ? 1 : 0,
         transform: visible ? "translateY(0)" : "translateY(10px)",
@@ -97,15 +93,8 @@ export default function DiscordHeatmap() {
       }}
     >
       {/* ヘッダー */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 14,
-        }}
-      >
-        <h3 style={{ color: "#e6edf3", fontWeight: 700, fontSize: 20, margin: 0 }}>
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <h3 style={{ color: "#e6edf3", fontWeight: 700, fontSize: 18, margin: 0 }}>
           Discord アクティビティ
         </h3>
 
@@ -141,85 +130,109 @@ export default function DiscordHeatmap() {
         </div>
       </div>
 
-      {/* ヒートマップ本体 */}
-      <div>
-        <div style={{ display: "grid", gridTemplateColumns: "22px 1fr", marginBottom: 3 }}>
-          <div />
-          <div style={{ position: "relative", height: 20 }}>
-            {HOUR_TICKS.map((h) => (
-              <span
-                key={h}
+      {/* ヒートマップ本体: モバイルで横スクロール */}
+      <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: "touch" }}>
+        <div style={{ minWidth: 320 }}>
+          {/* 時刻ラベル行 */}
+          <div style={{ display: "grid", gridTemplateColumns: "22px 1fr", marginBottom: 3 }}>
+            <div />
+            <div style={{ position: "relative", height: 20 }}>
+              {/* モバイルは間引いた目盛り、デスクトップは細かい目盛り */}
+              <div className="block sm:hidden">
+                {HOUR_TICKS.map((h) => (
+                  <span
+                    key={h}
+                    style={{
+                      position: "absolute",
+                      left: `${(h / 24) * 100}%`,
+                      transform: "translateX(-50%)",
+                      fontSize: 11,
+                      color: "#636e7b",
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    {h}
+                  </span>
+                ))}
+              </div>
+              <div className="hidden sm:block">
+                {HOUR_TICKS_DESKTOP.map((h) => (
+                  <span
+                    key={h}
+                    style={{
+                      position: "absolute",
+                      left: `${(h / 24) * 100}%`,
+                      transform: "translateX(-50%)",
+                      fontSize: 12,
+                      color: "#636e7b",
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    {h}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* グリッド行 */}
+          {DAY_LABELS.map((dayLabel, d) => (
+            <div
+              key={d}
+              style={{ display: "grid", gridTemplateColumns: "22px 1fr", gap: 3, marginBottom: 2 }}
+            >
+              <div
                 style={{
-                  position: "absolute",
-                  left: `${(h / 24) * 100}%`,
-                  transform: "translateX(-50%)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                   fontSize: 12,
-                  color: "#636e7b",
-                  fontFamily: "monospace",
+                  color: isCurrent && d === now.day ? "#a5b4fc" : d >= 5 ? "#7c8cf5" : "#636e7b",
+                  fontWeight: (isCurrent && d === now.day) || d >= 5 ? 700 : 400,
                 }}
               >
-                {h}
-              </span>
-            ))}
-          </div>
+                {dayLabel}
+              </div>
+
+              <div style={{ display: "flex", gap: 2 }}>
+                {Array.from({ length: 24 }, (_, h) => {
+                  const norm = loading ? 0 : display.normalized[d][h];
+                  const count = loading ? 0 : display.matrix[d][h];
+                  const isHovered = hovered?.day === d && hovered?.hour === h;
+                  const isNow = isCurrent && now.day === d && now.hour === h;
+                  const cellStyle = getCellStyle(norm);
+
+                  return (
+                    <div
+                      key={h}
+                      onMouseEnter={() => setHovered({ day: d, hour: h })}
+                      onMouseLeave={() => setHovered(null)}
+                      style={{
+                        flex: 1,
+                        aspectRatio: "1 / 1",
+                        borderRadius: 3,
+                        background: loading ? "rgba(22,27,34,0.5)" : cellStyle.background,
+                        outline: isNow ? "2px solid rgba(255,255,255,0.9)" : "none",
+                        outlineOffset: isNow ? "1px" : "0",
+                        zIndex: isNow ? 1 : 0,
+                        boxShadow: isHovered
+                          ? "0 0 0 1.5px rgba(88,101,242,0.8), 0 0 8px rgba(88,101,242,0.5)"
+                          : cellStyle.boxShadow,
+                        transition: "box-shadow 0.12s ease",
+                        cursor: count > 0 ? "pointer" : "default",
+                        animation: loading
+                          ? `pulse 1.5s ease-in-out ${(d * 24 + h) * 8}ms infinite`
+                          : isNow
+                            ? "pulse-now 2s ease-in-out infinite"
+                            : "none",
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
-
-        {DAY_LABELS.map((dayLabel, d) => (
-          <div
-            key={d}
-            style={{ display: "grid", gridTemplateColumns: "22px 1fr", gap: 3, marginBottom: 2 }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 12,
-                color: isCurrent && d === now.day ? "#a5b4fc" : d >= 5 ? "#7c8cf5" : "#636e7b",
-                fontWeight: (isCurrent && d === now.day) || d >= 5 ? 700 : 400,
-              }}
-            >
-              {dayLabel}
-            </div>
-
-            <div style={{ display: "flex", gap: 2 }}>
-              {Array.from({ length: 24 }, (_, h) => {
-                const norm = loading ? 0 : display.normalized[d][h];
-                const count = loading ? 0 : display.matrix[d][h];
-                const isHovered = hovered?.day === d && hovered?.hour === h;
-                const isNow = isCurrent && now.day === d && now.hour === h;
-                const cellStyle = getCellStyle(norm);
-
-                return (
-                  <div
-                    key={h}
-                    onMouseEnter={() => setHovered({ day: d, hour: h })}
-                    onMouseLeave={() => setHovered(null)}
-                    style={{
-                      flex: 1,
-                      aspectRatio: "1 / 1",
-                      borderRadius: 3,
-                      background: loading ? "rgba(22,27,34,0.5)" : cellStyle.background,
-                      outline: isNow ? "2px solid rgba(255,255,255,0.9)" : "none",
-                      outlineOffset: isNow ? "1px" : "0",
-                      zIndex: isNow ? 1 : 0,
-                      boxShadow: isHovered
-                        ? "0 0 0 1.5px rgba(88,101,242,0.8), 0 0 8px rgba(88,101,242,0.5)"
-                        : cellStyle.boxShadow,
-                      transition: "box-shadow 0.12s ease",
-                      cursor: count > 0 ? "pointer" : "default",
-                      animation: loading
-                        ? `pulse 1.5s ease-in-out ${(d * 24 + h) * 8}ms infinite`
-                        : isNow
-                          ? "pulse-now 2s ease-in-out infinite"
-                          : "none",
-                    }}
-                  />
-                );
-              })}
-            </div>
-          </div>
-        ))}
       </div>
 
       {/* 凡例 */}

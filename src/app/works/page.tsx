@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import Header from "@/components/Header";
 import RadioNav from "@/components/RadioNav";
+import PageShell from "@/components/PageShell";
 
 export default async function WorksPage() {
   const session = await auth();
@@ -10,7 +11,7 @@ export default async function WorksPage() {
   return (
     <div className="min-h-screen bg-[#0d1117]">
       <RadioNav />
-      <div style={{ paddingLeft: "56px" }}>
+      <PageShell>
         <Header />
         <main className="mx-auto max-w-3xl px-4 py-6 md:px-6">
           <div className="mb-6">
@@ -27,7 +28,7 @@ export default async function WorksPage() {
           </div>
           <p className="flex-center">ホームページ・iniad-nexusとか？ハッカソンの制作物など</p>
         </main>
-      </div>
+      </PageShell>
     </div>
   );
 }
