@@ -219,6 +219,18 @@ export default function FrameworkChart() {
   const [loading, setLoading] = useState(true);
   const [activeCategories, setActiveCategories] = useState<Set<Category>>(new Set(ALL_CATEGORIES));
   const [sortKey, setSortKey] = useState<SortKey>("popular");
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+
+    handleResize();
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   useEffect(() => {
     fetch("/api/frameworks/all")
@@ -262,8 +274,8 @@ export default function FrameworkChart() {
 
   // レスポンシブなマージン計算
   // YAxisのフレームワーク名は英語なので最大約130px, モバイルでは80pxに縮小
-  const yAxisWidth = typeof window !== "undefined" && window.innerWidth < 640 ? 80 : 110;
-  const rightMargin = typeof window !== "undefined" && window.innerWidth < 640 ? 24 : 48;
+  const yAxisWidth = isMobile ? 80 : 110;
+  const rightMargin = isMobile ? 24 : 48;
 
   return (
     <div className="w-full rounded-xl border border-[#2ea043]/40 bg-[#0d1117] p-4 shadow-[0_0_20px_rgba(46,160,67,0.15)] sm:p-5">
