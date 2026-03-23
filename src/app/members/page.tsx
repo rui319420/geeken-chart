@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import Image from "next/image";
 import Header from "@/components/Header";
 import RadioNav from "@/components/RadioNav";
+import Link from "next/link";
+import PageShell from "@/components/PageShell";
 
 type Member = {
   id: string;
@@ -102,7 +104,7 @@ export default async function MembersPage() {
     <div className="min-h-screen bg-[#0d1117]">
       <RadioNav />
 
-      <div style={{ paddingLeft: "56px" }}>
+      <PageShell>
         <Header />
 
         <main className="mx-auto max-w-3xl px-4 py-10 md:px-6">
@@ -178,7 +180,7 @@ export default async function MembersPage() {
             GitHubでログインするとメンバーとして表示されます
           </p>
         </main>
-      </div>
+      </PageShell>
     </div>
   );
 }

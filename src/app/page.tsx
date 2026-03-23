@@ -11,6 +11,7 @@ import DiscordHeatmap from "@/components/DiscordHeatmap";
 import RadioNav from "@/components/RadioNav";
 import SurveyWidget from "@/components/SurveyWidget";
 import AiModelPieChart from "@/components/AiModelPieChart";
+import PageShell from "@/components/PageShell";
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -73,40 +74,41 @@ export default async function HomePage() {
     <div className="relative min-h-screen bg-[#0d1117]">
       <Background />
       <RadioNav />
-
-      <div className="relative z-10" style={{ paddingLeft: "56px" }}>
-        <Header />
-        <main className="mx-auto max-w-7xl px-4 py-6 md:px-6">
-          <section id="dashboard" className="mb-6">
-            <StatsCards />
-          </section>
-          <section className="mb-6">
-            <CombinedHeatmap />
-          </section>
-          <section className="mb-6">
-            <ContributionGraph />
-          </section>
-          <div className="mb-6 grid grid-cols-1 gap-5 xl:grid-cols-2">
-            <LanguagePieChart />
-            <AiModelPieChart />
-          </div>
-          <section className="mb-6">
-            <LanguageTrendChart />
-          </section>
-          <section id="discord" className="mb-6">
-            <DiscordHeatmap />
-          </section>
-
-          {isDev && (
-            <section className="mt-10 border-t border-white/5 pt-8">
-              <p className="mb-3 text-xs font-semibold tracking-widest text-[#636e7b] uppercase">
-                開発用ツール
-              </p>
-              <RefreshButton />
+      <PageShell>
+        <div className="relative z-10">
+          <Header />
+          <main className="mx-auto max-w-7xl space-y-5 px-4 py-6 md:px-6">
+            <section id="dashboard">
+              <StatsCards />
             </section>
-          )}
-        </main>
-      </div>
+            <section>
+              <CombinedHeatmap />
+            </section>
+            <section>
+              <ContributionGraph />
+            </section>
+            <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+              <LanguagePieChart />
+              <AiModelPieChart />
+            </div>
+            <section>
+              <LanguageTrendChart />
+            </section>
+            <section id="discord">
+              <DiscordHeatmap />
+            </section>
+
+            {isDev && (
+              <section className="mt-10 border-t border-white/5 pt-8">
+                <p className="mb-3 text-xs font-semibold tracking-widest text-[#636e7b] uppercase">
+                  開発用ツール
+                </p>
+                <RefreshButton />
+              </section>
+            )}
+          </main>
+        </div>
+      </PageShell>
     </div>
   );
 }

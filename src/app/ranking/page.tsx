@@ -1,4 +1,5 @@
 import Header from "@/components/Header";
+import PageShell from "@/components/PageShell";
 import RadioNav from "@/components/RadioNav";
 import RankingBoard from "@/components/RankingBoard";
 
@@ -7,7 +8,7 @@ export default function RankingPage() {
   return (
     <div className="min-h-screen bg-[#0d1117]">
       <RadioNav />
-      <div style={{ paddingLeft: "56px" }}>
+      <PageShell>
         <Header />
         <main className="mx-auto max-w-3xl px-4 py-6 md:px-6">
           <div className="mb-6">
@@ -16,7 +17,7 @@ export default function RankingPage() {
           </div>
           <RankingBoard />
         </main>
-      </div>
+      </PageShell>
     </div>
   );
 }
