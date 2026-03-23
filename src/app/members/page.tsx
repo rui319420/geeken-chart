@@ -5,6 +5,7 @@ import Image from "next/image";
 import Header from "@/components/Header";
 import RadioNav from "@/components/RadioNav";
 import Link from "next/link";
+import PageShell from "@/components/PageShell";
 
 type Member = {
   id: string;
