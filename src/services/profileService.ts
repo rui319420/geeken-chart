@@ -12,10 +12,11 @@ export async function updateUserProfile(userId: string, data: ProfileUpdateReque
       data: { nickname: data.nickname },
     });
 
-    if (data.links) {
-      const incomingLinkIds = data.links
-        .map((link) => link.id)
-        .filter((id): id is string => id !== undefined);
+    if (data.links && data.links.length > 0) {
+      const existingLinks = data.links.filter((link) => link.id);
+      const newLinks = data.links.filter((link) => !link.id);
+
+      const incomingLinkIds = existingLinks.map((l) => l.id as string);
 
       await tx.userLink.deleteMany({
         where: {
@@ -24,24 +25,28 @@ export async function updateUserProfile(userId: string, data: ProfileUpdateReque
         },
       });
 
-      for (const link of data.links) {
-        if (link.id) {
-          await tx.userLink.updateMany({
-            where: {
-              id: link.id,
-              userId: userId,
-            },
-            data: { platform: link.platform, url: link.url },
-          });
-        } else {
-          await tx.userLink.create({
-            data: {
-              userId: userId,
-              platform: link.platform,
-              url: link.url,
-            },
-          });
-        }
+      if (existingLinks.length > 0) {
+        await Promise.all(
+          existingLinks.map((link) =>
+            tx.userLink.updateMany({
+              where: {
+                id: link.id,
+                userId: userId,
+              },
+              data: { platform: link.platform, url: link.url },
+            }),
+          ),
+        );
+      }
+
+      if (newLinks.length > 0) {
+        await tx.userLink.createMany({
+          data: newLinks.map((link) => ({
+            userId: userId,
+            platform: link.platform,
+            url: link.url,
+          })),
+        });
       }
     } else {
       await tx.userLink.deleteMany({ where: { userId } });
