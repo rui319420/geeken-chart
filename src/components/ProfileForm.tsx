@@ -32,7 +32,8 @@ export default function ProfileForm({ initialData }: { initialData: UserData }) 
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  const addLink = () => setLinks([...links, { platform: "X", url: "" }]);
+  const addLink = () =>
+    setLinks([...links, { platform: "X", url: "", localId: crypto.randomUUID() }]);
 
   const removeLink = (index: number) => {
     setLinks(links.filter((_, i) => i !== index));
@@ -59,7 +60,7 @@ export default function ProfileForm({ initialData }: { initialData: UserData }) 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nickname,
-          links: validLinks.map((l) => ({ platform: l.platform, url: l.url })),
+          links: validLinks.map((l) => ({ id: l.id, platform: l.platform, url: l.url })),
         }),
       });
 

@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 
 export type ProfileUpdateRequest = {
   nickname?: string | null;
-  links: { platform: string; url: string }[];
+  links: { id?: string; platform: string; url: string }[];
 };
 
 export async function updateUserProfile(userId: string, data: ProfileUpdateRequest) {
@@ -12,16 +12,44 @@ export async function updateUserProfile(userId: string, data: ProfileUpdateReque
       data: { nickname: data.nickname },
     });
 
-    await tx.userLink.deleteMany({ where: { userId } });
+    if (data.links && data.links.length > 0) {
+      const existingLinks = data.links.filter((link) => link.id);
+      const newLinks = data.links.filter((link) => !link.id);
 
-    if (data.links.length > 0) {
-      await tx.userLink.createMany({
-        data: data.links.map((link) => ({
-          userId,
-          platform: link.platform,
-          url: link.url,
-        })),
+      const incomingLinkIds = existingLinks.map((l) => l.id as string);
+
+      await tx.userLink.deleteMany({
+        where: {
+          userId: userId,
+          ...(incomingLinkIds.length > 0 ? { id: { notIn: incomingLinkIds } } : {}),
+        },
       });
+
+      if (existingLinks.length > 0) {
+        await Promise.all(
+          existingLinks.map((link) =>
+            tx.userLink.updateMany({
+              where: {
+                id: link.id,
+                userId: userId,
+              },
+              data: { platform: link.platform, url: link.url },
+            }),
+          ),
+        );
+      }
+
+      if (newLinks.length > 0) {
+        await tx.userLink.createMany({
+          data: newLinks.map((link) => ({
+            userId: userId,
+            platform: link.platform,
+            url: link.url,
+          })),
+        });
+      }
+    } else {
+      await tx.userLink.deleteMany({ where: { userId } });
     }
 
     return await tx.user.findUnique({
