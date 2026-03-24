@@ -20,16 +20,17 @@ export async function updateUserProfile(userId: string, data: ProfileUpdateReque
       await tx.userLink.deleteMany({
         where: {
           userId: userId,
-          id: {
-            notIn: incomingLinkIds.length > 0 ? incomingLinkIds : ["dummy-id-to-prevent-empty-in"],
-          },
+          ...(incomingLinkIds.length > 0 ? { id: { notIn: incomingLinkIds } } : {}),
         },
       });
 
       for (const link of data.links) {
         if (link.id) {
-          await tx.userLink.update({
-            where: { id: link.id },
+          await tx.userLink.updateMany({
+            where: {
+              id: link.id,
+              userId: userId,
+            },
             data: { platform: link.platform, url: link.url },
           });
         } else {
