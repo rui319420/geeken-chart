@@ -12,13 +12,17 @@ import {
   Legend,
 } from "recharts";
 
-type Period = "1m" | "3m" | "all";
+type Period = "3d" | "1w" | "1m" | "3m" | "all";
 
 const periodLabels: Record<Period, string> = {
+  "3d": "直近3日",
+  "1w": "1週間",
   "1m": "1ヶ月",
   "3m": "3ヶ月",
   all: "全期間",
 };
+
+const DAY_LABELS = ["月", "火", "水", "木", "金", "土", "日"];
 
 interface WeeklyData {
   weekKey: string;
@@ -26,30 +30,54 @@ interface WeeklyData {
   presenceCount: number;
 }
 
+interface DailyData {
+  date: string; // "YYYY-MM-DD"
+  messageCount: number;
+  presenceCount: number;
+}
+
+interface ApiResponse {
+  weekly: WeeklyData[];
+  daily: DailyData[];
+}
+
 interface ChartPoint {
-  weekKey: string;
+  key: string;
   label: string;
   messageCount: number;
   presenceCount: number;
 }
 
-// "2026-W11" → "3/10" (Monday of that week, approximate)
-function weekKeyToLabel(weekKey: string): string {
-  const match = weekKey.match(/^(\d{4})-W(\d{2})$/);
-  if (!match) return weekKey;
-  const year = parseInt(match[1]);
-  const week = parseInt(match[2]);
-  const date = new Date(Date.UTC(year, 0, 1 + (week - 1) * 7));
-  return `${date.getUTCMonth() + 1}/${date.getUTCDate()}`;
-}
-
-// "2026-W11" → Date
-function weekKeyToDate(weekKey: string): Date {
+// "2026-W11" → Monday Date (ISO week)
+function weekKeyToMonday(weekKey: string): Date {
   const match = weekKey.match(/^(\d{4})-W(\d{2})$/);
   if (!match) return new Date(0);
   const year = parseInt(match[1]);
   const week = parseInt(match[2]);
-  return new Date(Date.UTC(year, 0, 1 + (week - 1) * 7));
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const jan4Day = jan4.getUTCDay() || 7;
+  const monday = new Date(jan4);
+  monday.setUTCDate(jan4.getUTCDate() - jan4Day + 1 + (week - 1) * 7);
+  return monday;
+}
+
+// "2026-W11" → "3/10" (その週の月曜日)
+function weekKeyToLabel(weekKey: string): string {
+  const d = weekKeyToMonday(weekKey);
+  return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
+}
+
+// "2026-03-24" → "3/24 (月)"
+function dateToLabel(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00Z");
+  const dow = DAY_LABELS[(d.getUTCDay() + 6) % 7]; // 0=Sun→6 → 月=0
+  return `${d.getUTCMonth() + 1}/${d.getUTCDate()} (${dow})`;
+}
+
+// "2026-03-24" → "3/24" (短縮)
+function dateToShortLabel(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00Z");
+  return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
 }
 
 const CustomTooltip = ({
@@ -72,7 +100,7 @@ const CustomTooltip = ({
         boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
       }}
     >
-      <p style={{ color: "#8b949e", fontSize: 11, margin: "0 0 6px" }}>{label} 週</p>
+      <p style={{ color: "#8b949e", fontSize: 11, margin: "0 0 6px" }}>{label}</p>
       {payload.map((entry) => (
         <div
           key={entry.dataKey}
@@ -149,17 +177,19 @@ const CustomLegend = ({
 };
 
 export default function DiscordActivityChart() {
-  const [rawData, setRawData] = useState<WeeklyData[]>([]);
+  const [weekly, setWeekly] = useState<WeeklyData[]>([]);
+  const [daily, setDaily] = useState<DailyData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [period, setPeriod] = useState<Period>("3m");
+  const [period, setPeriod] = useState<Period>("1w");
   const [hiddenLines, setHiddenLines] = useState<Set<string>>(new Set());
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     fetch("/api/discord/trend")
       .then((r) => r.json())
-      .then((json: WeeklyData[]) => {
-        if (Array.isArray(json)) setRawData(json);
+      .then((json: ApiResponse) => {
+        if (Array.isArray(json.weekly)) setWeekly(json.weekly);
+        if (Array.isArray(json.daily)) setDaily(json.daily);
       })
       .catch((e) => console.error("Discord trend fetch failed:", e))
       .finally(() => setLoading(false));
@@ -168,23 +198,56 @@ export default function DiscordActivityChart() {
     return () => clearTimeout(t);
   }, []);
 
-  const data: ChartPoint[] = useMemo(() => {
+  // 期間に応じてデータとラベルを生成
+  const { data, isDaily } = useMemo((): { data: ChartPoint[]; isDaily: boolean } => {
     const now = new Date();
     const cutoff = new Date();
 
+    if (period === "3d") {
+      cutoff.setDate(now.getDate() - 3);
+      const filtered = daily.filter((d) => new Date(d.date + "T00:00:00Z") >= cutoff);
+      return {
+        data: filtered.map((d) => ({
+          key: d.date,
+          label: dateToLabel(d.date),
+          messageCount: d.messageCount,
+          presenceCount: d.presenceCount,
+        })),
+        isDaily: true,
+      };
+    }
+
+    if (period === "1w") {
+      cutoff.setDate(now.getDate() - 7);
+      const filtered = daily.filter((d) => new Date(d.date + "T00:00:00Z") >= cutoff);
+      return {
+        data: filtered.map((d) => ({
+          key: d.date,
+          label: dateToShortLabel(d.date),
+          messageCount: d.messageCount,
+          presenceCount: d.presenceCount,
+        })),
+        isDaily: true,
+      };
+    }
+
+    // 週次モード (1m / 3m / all)
     if (period === "1m") cutoff.setMonth(now.getMonth() - 1);
     else if (period === "3m") cutoff.setMonth(now.getMonth() - 3);
     else cutoff.setFullYear(2000);
 
-    return rawData
-      .filter((d) => weekKeyToDate(d.weekKey) >= cutoff)
-      .map((d) => ({
-        weekKey: d.weekKey,
-        label: weekKeyToLabel(d.weekKey),
-        messageCount: d.messageCount,
-        presenceCount: d.presenceCount,
-      }));
-  }, [rawData, period]);
+    return {
+      data: weekly
+        .filter((w) => weekKeyToMonday(w.weekKey) >= cutoff)
+        .map((w) => ({
+          key: w.weekKey,
+          label: weekKeyToLabel(w.weekKey),
+          messageCount: w.messageCount,
+          presenceCount: w.presenceCount,
+        })),
+      isDaily: false,
+    };
+  }, [weekly, daily, period]);
 
   const toggleLine = (key: string) => {
     setHiddenLines((prev) => {
@@ -196,13 +259,17 @@ export default function DiscordActivityChart() {
   };
 
   const totalMessages = data.reduce((s, d) => s + d.messageCount, 0);
-  const activeWeeks = data.filter((d) => d.messageCount > 0).length;
+  const activeCount = data.filter((d) => d.messageCount > 0).length;
+  const activeLabel = isDaily ? "アクティブ日" : "アクティブ週";
+
   const tickInterval =
     period === "all"
       ? Math.max(1, Math.floor(data.length / 16))
       : period === "3m"
         ? Math.max(1, Math.floor(data.length / 10))
         : 0;
+
+  const rotateXAxis = period === "all" || (isDaily && data.length > 5);
 
   return (
     <div
@@ -234,7 +301,7 @@ export default function DiscordActivityChart() {
             Discord 活動推移
           </p>
           <p style={{ color: "#636e7b", fontSize: 12, margin: "2px 0 0" }}>
-            週次のメッセージ数・オンライン回数の推移
+            {isDaily ? "日次" : "週次"}のメッセージ数・オンライン回数の推移
           </p>
         </div>
 
@@ -303,7 +370,7 @@ export default function DiscordActivityChart() {
           >
             <p style={{ color: "#636e7b", fontSize: 10, margin: "0 0 2px" }}>アクティブ週</p>
             <p style={{ color: "#3ba55c", fontSize: 16, fontWeight: 700, margin: 0 }}>
-              {activeWeeks} 週
+              {activeCount} {activeLabel}
             </p>
           </div>
         </div>
@@ -368,9 +435,9 @@ export default function DiscordActivityChart() {
                 tickLine={false}
                 axisLine={false}
                 interval={tickInterval}
-                angle={period === "all" ? -45 : 0}
-                textAnchor={period === "all" ? "end" : "middle"}
-                dy={period === "all" ? 0 : 6}
+                angle={rotateXAxis ? -45 : 0}
+                textAnchor={rotateXAxis ? "end" : "middle"}
+                dy={rotateXAxis ? 0 : 6}
               />
               <YAxis
                 tick={{ fill: "#8b949e", fontSize: 11 }}
