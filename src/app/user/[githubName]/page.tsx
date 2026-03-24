@@ -40,6 +40,14 @@ export default async function PublicProfilePage({
   return (
     <div className="min-h-screen bg-[#0d1117] py-10">
       <div className="container mx-auto max-w-3xl p-6">
+        <div className="mb-4">
+          <Link
+            href="/"
+            className="flex items-center gap-2 text-gray-400 transition-colors hover:text-white"
+          >
+            <span>← トップページに戻る</span>
+          </Link>
+        </div>
         <div className="overflow-hidden rounded-xl border border-gray-800 bg-[#161b22] shadow-xl">
           <div className="flex flex-col items-center gap-6 border-b border-gray-800 p-8 sm:flex-row sm:items-start">
             <Image
