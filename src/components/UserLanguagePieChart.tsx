@@ -151,9 +151,10 @@ export default function UserLanguagePieChart({ languages }: { languages: RawLang
   );
 
   useEffect(() => {
+    if (data.length <= 1) return;
     startLoop();
     return () => stopLoop();
-  }, [startLoop, stopLoop]);
+  }, [data.length, startLoop, stopLoop]);
 
   if (data.length === 0) {
     return <p className="text-sm text-gray-500">表示できる言語データがありません。</p>;
