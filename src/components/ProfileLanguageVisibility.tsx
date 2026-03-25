@@ -74,7 +74,7 @@ export default function ProfileLanguageVisibility({
             return (
               <label
                 key={lang.id}
-                className={`flex cursor-pointer items-center justify-between rounded-lg border p-3 transition-colors ${
+                className={`flex cursor-pointer items-center justify-between rounded-lg border p-3 transition-colors focus-within:ring-2 focus-within:ring-blue-500 ${
                   !isVisible
                     ? "border-gray-800 bg-[#0d1117] opacity-60 hover:bg-[#161b22]"
                     : "border-gray-700 bg-[#0d1117] hover:border-gray-600 hover:bg-[#21262d]"
