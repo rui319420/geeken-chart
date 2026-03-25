@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import Link from "next/link";
 import Image from "next/image";
+import UserLanguagePieChart from "@/components/UserLanguagePieChart";
 
 export default async function PublicProfilePage({
   params,
@@ -17,8 +18,9 @@ export default async function PublicProfilePage({
     include: {
       links: true,
       languages: {
+        where: { isHiddenProfile: false },
         orderBy: { bytes: "desc" },
-        take: 8,
+        take: 50,
       },
     },
   });
@@ -87,22 +89,11 @@ export default async function PublicProfilePage({
           <div className="space-y-8 p-8">
             <section>
               <h2 className="mb-4 border-b border-gray-800 pb-2 text-lg font-bold text-gray-200">
-                💻 主な使用言語
+                💻 言語スキル比率
               </h2>
-              {user.languages.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {user.languages.map((lang) => (
-                    <span
-                      key={lang.id}
-                      className="rounded-md border border-[#2ea043]/40 bg-[#2ea043]/10 px-3 py-1 text-sm font-medium text-[#3fb950]"
-                    >
-                      {lang.language}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500">言語データがありません。</p>
-              )}
+              <div className="rounded-lg border border-gray-800 bg-[#0d1117] p-4">
+                <UserLanguagePieChart languages={user.languages} />
+              </div>
             </section>
 
             <section>

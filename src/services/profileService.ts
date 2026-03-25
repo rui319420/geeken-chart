@@ -64,6 +64,7 @@ export async function getUserProfile(userId: string) {
     where: { id: userId },
     include: {
       links: true,
+      languages: true,
     },
   });
 

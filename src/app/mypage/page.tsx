@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { getUserProfile } from "@/services/profileService";
 import ProfileForm from "@/components/ProfileForm";
 import Link from "next/link";
+import ProfileLanguageVisibility from "@/components/ProfileLanguageVisibility";
 
 export default async function MyPage() {
   const session = await auth();
@@ -51,6 +52,7 @@ export default async function MyPage() {
 
           <ProfileForm initialData={userProfile} />
         </div>
+        <ProfileLanguageVisibility initialLanguages={userProfile.languages} />
       </div>
     </div>
   );

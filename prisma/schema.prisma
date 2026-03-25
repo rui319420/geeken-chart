@@ -76,6 +76,8 @@ model UserLanguage {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  isHiddenProfile Boolean @default(false)
+
   @@unique([userId, language]) // 同じユーザー×言語の組み合わせは1件のみ
 }
 
