@@ -20,6 +20,7 @@ export default async function PublicProfilePage({
       languages: {
         where: { isHiddenProfile: false },
         orderBy: { bytes: "desc" },
+        take: 50,
       },
     },
   });
