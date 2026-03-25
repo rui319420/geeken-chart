@@ -24,8 +24,8 @@ export default function ProfileLanguageVisibility({
   const handleToggle = async (langId: string, currentIsHidden: boolean) => {
     const newIsHidden = !currentIsHidden;
 
-    setLanguages(
-      languages.map((l) => (l.id === langId ? { ...l, isHiddenProfile: newIsHidden } : l)),
+    setLanguages((prev) =>
+      prev.map((l) => (l.id === langId ? { ...l, isHiddenProfile: newIsHidden } : l)),
     );
 
     try {
@@ -44,8 +44,8 @@ export default function ProfileLanguageVisibility({
     } catch (error) {
       console.error("Failed to update visibility:", error);
       // 失敗したら画面のスイッチを元の状態に戻す
-      setLanguages(
-        languages.map((l) => (l.id === langId ? { ...l, isHiddenProfile: currentIsHidden } : l)),
+      setLanguages((prev) =>
+        prev.map((l) => (l.id === langId ? { ...l, isHiddenProfile: currentIsHidden } : l)),
       );
       alert("設定の保存に失敗しました。");
     }

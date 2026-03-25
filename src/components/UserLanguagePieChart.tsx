@@ -93,6 +93,8 @@ export default function UserLanguagePieChart({ languages }: { languages: RawLang
 
     const totalBytes = languages.reduce((sum, lang) => sum + lang.bytes, 0);
 
+    if (totalBytes === 0) return [];
+
     // 上位5つ
     const top5 = languages.slice(0, 5).map((lang) => ({
       name: lang.language,
