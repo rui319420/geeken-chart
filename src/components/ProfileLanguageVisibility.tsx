@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { GITHUB_LANGUAGE_COLORS, getRandomColor } from "@/lib/constants";
 
@@ -19,6 +19,10 @@ export default function ProfileLanguageVisibility({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [languages, setLanguages] = useState<LanguageData[]>(initialLanguages);
+
+  useEffect(() => {
+    setLanguages(initialLanguages);
+  }, [initialLanguages]);
 
   // トグルスイッチを押した時の処理
   const handleToggle = async (langId: string, currentIsHidden: boolean) => {
