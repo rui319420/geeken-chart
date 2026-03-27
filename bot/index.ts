@@ -181,14 +181,21 @@ async function getLinkedUserId(discordId: string): Promise<string | null> {
 // 活動記録ユーティリティ
 // ──────────────────────────────────────
 
-async function recordMessage(discordId: string, timestamp: number): Promise<void> {
+async function recordMessage(
+  discordId: string,
+  timestamp: number,
+  channelId: string,
+  channelName: string,
+): Promise<void> {
   const { dayOfWeek, hour } = toJstActivity(new Date(timestamp));
   const weekKey = getWeekKey(new Date(timestamp));
 
   await prisma.rawDiscordActivity.upsert({
-    where: { discordId_weekKey_dayOfWeek_hour: { discordId, weekKey, dayOfWeek, hour } },
+    where: {
+      discordId_weekKey_dayOfWeek_hour_channelId: { discordId, weekKey, dayOfWeek, hour, channelId },
+    },
     update: { messageCount: { increment: 1 } },
-    create: { discordId, weekKey, dayOfWeek, hour, messageCount: 1 },
+    create: { discordId, channelId, channelName, weekKey, dayOfWeek, hour, messageCount: 1 },
   });
 
   const userId = await getLinkedUserId(discordId);
@@ -201,14 +208,21 @@ async function recordMessage(discordId: string, timestamp: number): Promise<void
   }
 }
 
-async function recordReaction(discordId: string, timestamp: number): Promise<void> {
+async function recordReaction(
+  discordId: string,
+  timestamp: number,
+  channelId: string,
+  channelName: string,
+): Promise<void> {
   const { dayOfWeek, hour } = toJstActivity(new Date(timestamp));
   const weekKey = getWeekKey(new Date(timestamp));
 
   await prisma.rawDiscordActivity.upsert({
-    where: { discordId_weekKey_dayOfWeek_hour: { discordId, weekKey, dayOfWeek, hour } },
+    where: {
+      discordId_weekKey_dayOfWeek_hour_channelId: { discordId, weekKey, dayOfWeek, hour, channelId },
+    },
     update: { reactionCount: { increment: 1 } },
-    create: { discordId, weekKey, dayOfWeek, hour, reactionCount: 1 },
+    create: { discordId, channelId, channelName, weekKey, dayOfWeek, hour, reactionCount: 1 },
   });
 }
 
@@ -245,15 +259,24 @@ async function pollOnlineMembers(): Promise<void> {
       onlineMembers.map((member) =>
         prisma.rawDiscordActivity.upsert({
           where: {
-            discordId_weekKey_dayOfWeek_hour: {
+            discordId_weekKey_dayOfWeek_hour_channelId: {
               discordId: member.id,
               weekKey,
               dayOfWeek,
               hour,
+              channelId: "__presence__",
             },
           },
           update: { presenceCount: { increment: 1 } },
-          create: { discordId: member.id, weekKey, dayOfWeek, hour, presenceCount: 1 },
+          create: {
+            discordId: member.id,
+            channelId: "__presence__",
+            channelName: "Presence Poll",
+            weekKey,
+            dayOfWeek,
+            hour,
+            presenceCount: 1,
+          },
         }),
       ),
     );
@@ -297,7 +320,10 @@ client.on(Events.MessageCreate, async (message: Message) => {
   if (message.guildId !== GUILD_ID) return;
 
   try {
-    await recordMessage(message.author.id, message.createdTimestamp);
+    const channelName =
+      "name" in message.channel ? (message.channel.name ?? "unknown") : "unknown";
+    const channelId = message.channelId ?? "unknown";
+    await recordMessage(message.author.id, message.createdTimestamp, channelId, channelName);
   } catch (err) {
     console.error("[Bot] messageCreate 記録失敗:", err);
   }
@@ -307,7 +333,7 @@ client.on(Events.MessageCreate, async (message: Message) => {
 // イベント: messageReactionAdd
 // ──────────────────────────────────────
 
-client.on(Events.MessageReactionAdd, async (reaction: MessageReaction, user: User) => {
+client.on(Events.MessageReactionAdd, async (reaction, user) => {
   if (user.bot) return;
 
   // Partial の場合はフェッチして補完
@@ -322,7 +348,12 @@ client.on(Events.MessageReactionAdd, async (reaction: MessageReaction, user: Use
   if (reaction.message.guildId !== GUILD_ID) return;
 
   try {
-    await recordReaction(user.id, Date.now());
+    const channelName =
+      reaction.message.channel && "name" in reaction.message.channel
+        ? (reaction.message.channel.name ?? "unknown")
+        : "unknown";
+    const channelId = reaction.message.channelId ?? "unknown";
+    await recordReaction(user.id, Date.now(), channelId, channelName);
   } catch (err) {
     console.error("[Bot] messageReactionAdd 記録失敗:", err);
   }

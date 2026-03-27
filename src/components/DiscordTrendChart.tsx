@@ -20,7 +20,6 @@ interface TrendPoint {
   label: string;
   messages: number;
   reactions: number;
-  presence: number;
   score: number;
 }
 
@@ -38,10 +37,19 @@ interface TrendSummary {
   bg: string;
 }
 
+interface TrendApiResponse {
+  points: TrendPoint[];
+  hottestChannel: string | null;
+}
+
 // ─── 定数 ─────────────────────────────────────────────────────────
 const WEEK_PERIOD = "1w";
 const WEEK_TICK_INTERVAL = 23; // 168点 → 24h ごと (7 ラベル)
 const WEEK_DOT_R = 0; // 点数が多いので非表示
+
+const TREND_UP_STRONG = 0.4;
+const TREND_UP = 0.1;
+const TREND_DOWN_STRONG = -0.4;
 
 function summarizeCurrentTrend(data: TrendPoint[]): TrendSummary {
   if (data.length === 0) {
@@ -57,8 +65,7 @@ function summarizeCurrentTrend(data: TrendPoint[]): TrendSummary {
   const recent = data.slice(-24);
   const previous = data.slice(-48, -24);
 
-  const scoreOf = (point: TrendPoint) =>
-    point.messages * 2 + point.reactions * 1.5 + point.presence * 0.5;
+  const scoreOf = (point: TrendPoint) => point.messages * 2 + point.reactions * 1;
   const recentScore = recent.reduce((sum, point) => sum + scoreOf(point), 0);
   const prevScore = previous.reduce((sum, point) => sum + scoreOf(point), 0);
 
@@ -72,32 +79,44 @@ function summarizeCurrentTrend(data: TrendPoint[]): TrendSummary {
     };
   }
 
-  const ratio = prevScore > 0 ? (recentScore - prevScore) / prevScore : 1;
-
-  if (ratio >= 0.4) {
+  if (prevScore === 0 && recentScore > 0) {
     return {
-      label: "急上昇",
-      detail: "直近の会話が大きく活発化しています",
+      label: "立ち上がり",
+      detail: "直近で会話が生まれ始めています",
       color: "#57f287",
       border: "rgba(87,242,135,0.35)",
       bg: "rgba(87,242,135,0.12)",
     };
   }
 
-  if (ratio >= 0.1) {
+  const ratio = prevScore > 0 ? (recentScore - prevScore) / prevScore : 0;
+  const ratioPct = Math.round(ratio * 100);
+  const ratioText = `${ratioPct > 0 ? "+" : ""}${ratioPct}%`;
+
+  if (ratio >= TREND_UP_STRONG) {
+    return {
+      label: "急上昇",
+      detail: `前半24h比 ${ratioText}`,
+      color: "#57f287",
+      border: "rgba(87,242,135,0.35)",
+      bg: "rgba(87,242,135,0.12)",
+    };
+  }
+
+  if (ratio >= TREND_UP) {
     return {
       label: "上向き",
-      detail: "直近の会話は増加傾向です",
+      detail: `前半24h比 ${ratioText}`,
       color: "#a5b4fc",
       border: "rgba(165,180,252,0.35)",
       bg: "rgba(165,180,252,0.12)",
     };
   }
 
-  if (ratio <= -0.4) {
+  if (ratio <= TREND_DOWN_STRONG) {
     return {
       label: "減速",
-      detail: "直近の会話はやや落ち着いています",
+      detail: `前半24h比 ${ratioText}`,
       color: "#fda4af",
       border: "rgba(253,164,175,0.35)",
       bg: "rgba(253,164,175,0.12)",
@@ -106,7 +125,7 @@ function summarizeCurrentTrend(data: TrendPoint[]): TrendSummary {
 
   return {
     label: "安定",
-    detail: "会話ペースはおおむね一定です",
+    detail: `前半24h比 ${ratioText}`,
     color: "#79c0ff",
     border: "rgba(121,192,255,0.35)",
     bg: "rgba(121,192,255,0.12)",
@@ -181,12 +200,14 @@ const CustomTooltip = ({
 export default function DiscordTrendChart() {
   const [mode, setMode] = useState<Mode>("score");
   const [data, setData] = useState<TrendPoint[]>([]);
+  const [hottestChannel, setHottestChannel] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const cache = useRef<TrendPoint[] | null>(null);
+  const cache = useRef<TrendApiResponse | null>(null);
 
   const fetchData = useCallback(async () => {
     if (cache.current) {
-      setData(cache.current);
+      setData(cache.current.points);
+      setHottestChannel(cache.current.hottestChannel);
       setLoading(false);
       return;
     }
@@ -194,13 +215,17 @@ export default function DiscordTrendChart() {
     try {
       const res = await fetch(`/api/discord/trend?period=${WEEK_PERIOD}`);
       const json: unknown = await res.json();
-      // 配列でない場合（エラーオブジェクト等）は空配列にフォールバック
-      const arr = Array.isArray(json) ? (json as TrendPoint[]) : [];
-      cache.current = arr;
-      setData(arr);
+      const payload: TrendApiResponse =
+        json && typeof json === "object" && Array.isArray((json as TrendApiResponse).points)
+          ? (json as TrendApiResponse)
+          : { points: [], hottestChannel: null };
+      cache.current = payload;
+      setData(payload.points);
+      setHottestChannel(payload.hottestChannel);
     } catch (e) {
       console.error("Discord trend fetch failed:", e);
       setData([]);
+      setHottestChannel(null);
     } finally {
       setLoading(false);
     }
@@ -215,6 +240,7 @@ export default function DiscordTrendChart() {
   const dotProp = dotR > 0 ? { r: dotR, strokeWidth: 0 } : false;
   const activeDot = { r: 5, stroke: "#0d1117", strokeWidth: 2 };
   const trendSummary = summarizeCurrentTrend(data);
+  const hottestChannelLabel = hottestChannel ? `#${hottestChannel}` : "データ集計中";
 
   // ボタンスタイルヘルパー
   const btnStyle = (active: boolean): React.CSSProperties => ({
@@ -265,7 +291,7 @@ export default function DiscordTrendChart() {
             Discord 盛り上がり推移
           </h3>
           <p style={{ color: "#636e7b", fontSize: 12, margin: "4px 0 0" }}>
-            メッセージ・リアクション・プレゼンスの推移
+            メッセージ・リアクションの推移
           </p>
           <div
             style={{
@@ -280,7 +306,7 @@ export default function DiscordTrendChart() {
             }}
           >
             <span style={{ color: trendSummary.color, fontSize: 12, fontWeight: 700 }}>
-              今の会話トレンド: {trendSummary.label}
+              盛り上がっているチャンネル: {hottestChannelLabel}
             </span>
             <span style={{ color: "#8b949e", fontSize: 11 }}>{trendSummary.detail}</span>
           </div>
@@ -303,9 +329,8 @@ export default function DiscordTrendChart() {
       {mode === "score" && (
         <div style={{ display: "flex", gap: 16, marginBottom: 14, flexWrap: "wrap" }}>
           {[
-            { label: "メッセージ", weight: "×2.0", color: "#5865f2" },
-            { label: "リアクション", weight: "×1.5", color: "#eb459e" },
-            { label: "プレゼンス", weight: "×0.5", color: "#57f287" },
+            { label: "メッセージ", weight: "+2.0", color: "#5865f2" },
+            { label: "リアクション", weight: "+1.0", color: "#eb459e" },
           ].map((it) => (
             <span
               key={it.label}
@@ -438,17 +463,6 @@ export default function DiscordTrendChart() {
                     strokeWidth={2}
                     dot={dotProp}
                     activeDot={{ ...activeDot, fill: "#eb459e" }}
-                    isAnimationActive
-                    animationDuration={500}
-                  />
-                  <Line
-                    type="linear"
-                    dataKey="presence"
-                    name="プレゼンス"
-                    stroke="#57f287"
-                    strokeWidth={2}
-                    dot={dotProp}
-                    activeDot={{ ...activeDot, fill: "#57f287" }}
                     isAnimationActive
                     animationDuration={500}
                   />

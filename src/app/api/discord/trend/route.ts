@@ -9,8 +9,12 @@ export interface TrendPoint {
   label: string;
   messages: number;
   reactions: number;
-  presence: number;
   score: number;
+}
+
+export interface TrendResponse {
+  points: TrendPoint[];
+  hottestChannel: string | null;
 }
 
 // ─── 定数 ─────────────────────────────────────────────────────────
@@ -132,49 +136,86 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Invalid period" }, { status: 400 });
   }
 
-  const cacheKey = `discord:trend:${period}:v4`;
+  const cacheKey = `discord:trend:${period}:v5`;
 
   try {
-    const cached = await redis.get<TrendPoint[]>(cacheKey);
+    const cached = await redis.get<TrendResponse>(cacheKey);
     if (cached) return NextResponse.json(cached);
 
     const weekKeys = weekKeysFor(period);
-    const rows = await prisma.rawDiscordActivity.groupBy({
-      by: ["weekKey", "dayOfWeek", "hour"],
-      where: { weekKey: { in: weekKeys } },
-      _sum: {
-        messageCount: true,
-        reactionCount: true,
-        presenceCount: true,
-      },
-    });
+    let hasChannelData = true;
 
     const nowMs = Date.now();
     const fromMs = nowMs - PERIOD_MS[period];
 
-    const map = new Map<string, { msg: number; rxn: number; pre: number }>();
-    for (const row of rows) {
-      const t = rowToUtcMs(row.weekKey, row.dayOfWeek, row.hour);
-      if (t < fromMs || t > nowMs) continue;
-      const k = toBucketKey(t, period);
-      const s = map.get(k) ?? { msg: 0, rxn: 0, pre: 0 };
-      s.msg += row._sum.messageCount ?? 0;
-      s.rxn += row._sum.reactionCount ?? 0;
-      s.pre += row._sum.presenceCount ?? 0;
-      map.set(k, s);
+    const map = new Map<string, { msg: number; rxn: number }>();
+    const channelScoreMap = new Map<string, number>();
+    try {
+      const rows = await prisma.rawDiscordActivity.groupBy({
+        by: ["weekKey", "dayOfWeek", "hour", "channelId", "channelName"],
+        where: { weekKey: { in: weekKeys } },
+        _sum: {
+          messageCount: true,
+          reactionCount: true,
+        },
+      });
+
+      for (const row of rows) {
+        const t = rowToUtcMs(row.weekKey, row.dayOfWeek, row.hour);
+        if (t < fromMs || t > nowMs) continue;
+        const k = toBucketKey(t, period);
+        const s = map.get(k) ?? { msg: 0, rxn: 0 };
+        const msg = row._sum.messageCount ?? 0;
+        const rxn = row._sum.reactionCount ?? 0;
+        s.msg += msg;
+        s.rxn += rxn;
+        map.set(k, s);
+
+        // presence polling 用の疑似チャネルは除外
+        if (row.channelId !== "__presence__") {
+          const current = channelScoreMap.get(row.channelName) ?? 0;
+          channelScoreMap.set(row.channelName, current + msg * 2 + rxn * 1);
+        }
+      }
+    } catch {
+      // マイグレーション前は channel 列が無いため、旧集計にフォールバック
+      hasChannelData = false;
+      const rows = await prisma.rawDiscordActivity.groupBy({
+        by: ["weekKey", "dayOfWeek", "hour"],
+        where: { weekKey: { in: weekKeys } },
+        _sum: {
+          messageCount: true,
+          reactionCount: true,
+        },
+      });
+
+      for (const row of rows) {
+        const t = rowToUtcMs(row.weekKey, row.dayOfWeek, row.hour);
+        if (t < fromMs || t > nowMs) continue;
+        const k = toBucketKey(t, period);
+        const s = map.get(k) ?? { msg: 0, rxn: 0 };
+        s.msg += row._sum.messageCount ?? 0;
+        s.rxn += row._sum.reactionCount ?? 0;
+        map.set(k, s);
+      }
     }
 
-    const result: TrendPoint[] = generateAllBuckets(period, fromMs, nowMs).map((k) => {
-      const s = map.get(k) ?? { msg: 0, rxn: 0, pre: 0 };
+    const points: TrendPoint[] = generateAllBuckets(period, fromMs, nowMs).map((k) => {
+      const s = map.get(k) ?? { msg: 0, rxn: 0 };
       return {
         key: k,
         label: toLabel(k, period),
         messages: s.msg,
         reactions: s.rxn,
-        presence: s.pre,
-        score: Math.round(s.msg * 2 + s.rxn * 1.5 + s.pre * 0.5),
+        score: Math.round(s.msg * 2 + s.rxn * 1),
       };
     });
+
+    const hottestChannel = hasChannelData
+      ? ([...channelScoreMap.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null)
+      : null;
+
+    const result: TrendResponse = { points, hottestChannel };
 
     await redis.set(cacheKey, result, { ex: CACHE_TTL[period] });
     return NextResponse.json(result);
