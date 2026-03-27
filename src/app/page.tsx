@@ -12,6 +12,7 @@ import RadioNav from "@/components/RadioNav";
 import SurveyWidget from "@/components/SurveyWidget";
 import AiModelPieChart from "@/components/AiModelPieChart";
 import PageShell from "@/components/PageShell";
+import DiscordTrendChart from "@/components/DiscordTrendChart";
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -94,8 +95,9 @@ export default async function HomePage() {
             <section>
               <LanguageTrendChart />
             </section>
-            <section id="discord">
+            <section id="discord" className="space-y-5">
               <DiscordHeatmap />
+              <DiscordTrendChart />
             </section>
 
             {isDev && (

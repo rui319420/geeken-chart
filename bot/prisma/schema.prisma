@@ -146,6 +146,7 @@ model RawDiscordActivity {
   hour          Int
   messageCount  Int      @default(0)
   presenceCount Int      @default(0)
+	reactionCount Int      @default(0)
   updatedAt     DateTime @updatedAt
 
   @@unique([discordId, weekKey, dayOfWeek, hour])
