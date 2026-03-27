@@ -95,7 +95,7 @@ export default function DiscordHeatmap() {
       {/* ヘッダー */}
       <div className="mb-4 flex items-center justify-between gap-2">
         <h3 style={{ color: "#e6edf3", fontWeight: 700, fontSize: 18, margin: 0 }}>
-          Discord アクティビティ
+          Discord アクティビティ（オンライン数）
         </h3>
 
         <div

@@ -6,7 +6,8 @@
  *   - discordId ベースで記録し、User との紐付けはオプション
  *   - 収集データ:
  *       1. messageCreate  → メッセージ送信（曜日×時間帯）
- *       2. ポーリング(30分毎) → その時間帯のオンライン人数を presenceCount に加算
+ *       2. messageReactionAdd → リアクション追加（曜日×時間帯）
+ *       3. ポーリング(30分毎) → その時間帯のオンライン人数を presenceCount に加算
  *
  * 必要な Privileged Intents (Developer Portal で ON にすること):
  *   - Message Content Intent
@@ -22,6 +23,8 @@ import {
   SlashCommandBuilder,
   ChatInputCommandInteraction,
   Message,
+  MessageReaction,
+  User,
   Events,
   Partials,
 } from "discord.js";
@@ -64,12 +67,30 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent, // Privileged: Message Content Intent
-    GatewayIntentBits.GuildMembers,   // Privileged: Server Members Intent
-    GatewayIntentBits.GuildPresences, // Privileged: Presence Intent
+    GatewayIntentBits.MessageContent,       // Privileged: Message Content Intent
+    GatewayIntentBits.GuildMembers,         // Privileged: Server Members Intent
+    GatewayIntentBits.GuildPresences,       // Privileged: Presence Intent
+    GatewayIntentBits.GuildMessageReactions, // リアクション追跡用
   ],
-  partials: [Partials.Message, Partials.Channel, Partials.GuildMember],
+  partials: [
+    Partials.Message,
+    Partials.Channel,
+    Partials.GuildMember,
+    Partials.Reaction,   // キャッシュ外メッセージへのリアクションも補足
+  ],
+  presence: {
+    status: "invisible",
+    activities: [],
+  },
 });
+
+function applyInvisiblePresence() {
+  if (!client.user) return;
+  client.user.setPresence({
+    status: "invisible",
+    activities: [],
+  });
+}
 
 // ──────────────────────────────────────
 // スラッシュコマンド定義
@@ -133,7 +154,7 @@ function getWeekKey(date: Date): string {
   const jst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
   const day = jst.getUTCDay(); // 0=Sun
   const monday = new Date(jst);
-  monday.setUTCDate(jst.getUTCDate() - (day + 6) % 7);
+  monday.setUTCDate(jst.getUTCDate() - ((day + 6) % 7));
   const year = monday.getUTCFullYear();
   const startOfYear = new Date(Date.UTC(year, 0, 1));
   const weekNo = Math.ceil(
@@ -172,18 +193,23 @@ async function getLinkedUserId(discordId: string): Promise<string | null> {
 // 活動記録ユーティリティ
 // ──────────────────────────────────────
 
-async function recordMessage(discordId: string, timestamp: number): Promise<void> {
+async function recordMessage(
+  discordId: string,
+  timestamp: number,
+  channelId: string,
+  channelName: string,
+): Promise<void> {
   const { dayOfWeek, hour } = toJstActivity(new Date(timestamp));
   const weekKey = getWeekKey(new Date(timestamp));
 
-  // 全員分を RawDiscordActivity へ
   await prisma.rawDiscordActivity.upsert({
-    where: { discordId_weekKey_dayOfWeek_hour: { discordId, weekKey, dayOfWeek, hour } },
+    where: {
+      discordId_weekKey_dayOfWeek_hour_channelId: { discordId, weekKey, dayOfWeek, hour, channelId },
+    },
     update: { messageCount: { increment: 1 } },
-    create: { discordId, weekKey, dayOfWeek, hour, messageCount: 1 },
+    create: { discordId, channelId, channelName, weekKey, dayOfWeek, hour, messageCount: 1 },
   });
 
-  // /link 済みは DiscordActivity にも二重書き
   const userId = await getLinkedUserId(discordId);
   if (userId) {
     await prisma.discordActivity.upsert({
@@ -192,6 +218,24 @@ async function recordMessage(discordId: string, timestamp: number): Promise<void
       create: { userId, dayOfWeek, hour, messageCount: 1 },
     });
   }
+}
+
+async function recordReaction(
+  discordId: string,
+  timestamp: number,
+  channelId: string,
+  channelName: string,
+): Promise<void> {
+  const { dayOfWeek, hour } = toJstActivity(new Date(timestamp));
+  const weekKey = getWeekKey(new Date(timestamp));
+
+  await prisma.rawDiscordActivity.upsert({
+    where: {
+      discordId_weekKey_dayOfWeek_hour_channelId: { discordId, weekKey, dayOfWeek, hour, channelId },
+    },
+    update: { reactionCount: { increment: 1 } },
+    create: { discordId, channelId, channelName, weekKey, dayOfWeek, hour, reactionCount: 1 },
+  });
 }
 
 // ──────────────────────────────────────
@@ -223,20 +267,28 @@ async function pollOnlineMembers(): Promise<void> {
     const { dayOfWeek, hour } = toJstActivity(now);
     const weekKey = getWeekKey(now);
 
-    // オンラインだった各メンバーの presenceCount を +1
     await Promise.all(
       onlineMembers.map((member) =>
         prisma.rawDiscordActivity.upsert({
           where: {
-            discordId_weekKey_dayOfWeek_hour: {
+            discordId_weekKey_dayOfWeek_hour_channelId: {
               discordId: member.id,
               weekKey,
               dayOfWeek,
               hour,
+              channelId: "__presence__",
             },
           },
           update: { presenceCount: { increment: 1 } },
-          create: { discordId: member.id, weekKey, dayOfWeek, hour, presenceCount: 1 },
+          create: {
+            discordId: member.id,
+            channelId: "__presence__",
+            channelName: "Presence Poll",
+            weekKey,
+            dayOfWeek,
+            hour,
+            presenceCount: 1,
+          },
         }),
       ),
     );
@@ -255,11 +307,10 @@ async function pollOnlineMembers(): Promise<void> {
 // ──────────────────────────────────────
 
 client.once(Events.ClientReady, async (readyClient) => {
-  readyClient.user.setPresence({ status: "invisible" });
+  applyInvisiblePresence();
   console.log(`[Bot] ログイン完了: ${readyClient.user.tag}`);
   await registerCommands();
 
-  // 起動時に全メンバーをキャッシュ（presence取得のため）
   try {
     const guild = await readyClient.guilds.fetch(GUILD_ID);
     await guild.members.fetch();
@@ -268,9 +319,17 @@ client.once(Events.ClientReady, async (readyClient) => {
     console.warn("[Bot] メンバーキャッシュ失敗:", err);
   }
 
-  // 起動直後に1回ポーリング → 以降30分ごと
   await pollOnlineMembers();
   setInterval(pollOnlineMembers, POLL_INTERVAL_MS);
+});
+
+// 再接続時に presence が戻るケースに備えて、都度 invisible を再適用する
+client.on(Events.ShardReady, () => {
+  applyInvisiblePresence();
+});
+
+client.on(Events.ShardResume, () => {
+  applyInvisiblePresence();
 });
 
 // ──────────────────────────────────────
@@ -282,9 +341,42 @@ client.on(Events.MessageCreate, async (message: Message) => {
   if (message.guildId !== GUILD_ID) return;
 
   try {
-    await recordMessage(message.author.id, message.createdTimestamp);
+    const channelName =
+      "name" in message.channel ? (message.channel.name ?? "unknown") : "unknown";
+    const channelId = message.channelId ?? "unknown";
+    await recordMessage(message.author.id, message.createdTimestamp, channelId, channelName);
   } catch (err) {
     console.error("[Bot] messageCreate 記録失敗:", err);
+  }
+});
+
+// ──────────────────────────────────────
+// イベント: messageReactionAdd
+// ──────────────────────────────────────
+
+client.on(Events.MessageReactionAdd, async (reaction, user) => {
+  if (user.bot) return;
+
+  // Partial の場合はフェッチして補完
+  try {
+    if (reaction.partial) await reaction.fetch();
+    if (reaction.message.partial) await reaction.message.fetch();
+  } catch (err) {
+    console.error("[Bot] リアクションフェッチ失敗:", err);
+    return;
+  }
+
+  if (reaction.message.guildId !== GUILD_ID) return;
+
+  try {
+    const channelName =
+      reaction.message.channel && "name" in reaction.message.channel
+        ? (reaction.message.channel.name ?? "unknown")
+        : "unknown";
+    const channelId = reaction.message.channelId ?? "unknown";
+    await recordReaction(user.id, Date.now(), channelId, channelName);
+  } catch (err) {
+    console.error("[Bot] messageReactionAdd 記録失敗:", err);
   }
 });
 

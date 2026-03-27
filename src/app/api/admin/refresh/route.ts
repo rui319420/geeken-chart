@@ -305,9 +305,9 @@ export async function POST(request: Request) {
   // ── 集計キャッシュをクリア ──────────────────────────────────────
   await Promise.all([
     redis.del("stats:dashboard"),
-    redis.del("languages:all:aggregated:total"),
-    redis.del("languages:all:aggregated:average"),
-    redis.del("languages:trend"),
+    redis.del("languages:all:aggregated:total:v7"),
+    redis.del("languages:all:aggregated:average:v7"),
+    redis.del("languages:trend:total"),
     redis.del("discord:heatmap:aggregated"),
     redis.del("frameworks:all:aggregated"),
     ...users.map((u) => redis.del(`repos:count:${u.githubName}`)),

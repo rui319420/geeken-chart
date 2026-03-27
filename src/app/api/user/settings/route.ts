@@ -64,8 +64,8 @@ export async function PATCH(request: Request) {
 
   // プライベートや言語公開設定が変わった時のみ、個人の言語データをリセットする
   if ("includePrivate" in data || "showLanguages" in data) {
-    await redis.del("languages:all:aggregated:total:v5");
-    await redis.del("languages:all:aggregated:average:v5");
+    await redis.del("languages:all:aggregated:total:v7");
+    await redis.del("languages:all:aggregated:average:v7");
 
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },

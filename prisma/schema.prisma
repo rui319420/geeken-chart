@@ -151,14 +151,17 @@ model VerificationToken {
 model RawDiscordActivity {
   id            String   @id @default(cuid())
   discordId     String
+  channelId     String   @default("unknown")
+  channelName   String   @default("不明")
   weekKey       String   @default("")
   dayOfWeek     Int
   hour          Int
   messageCount  Int      @default(0)
   presenceCount Int      @default(0)
+  reactionCount Int      @default(0)
   updatedAt     DateTime @updatedAt
 
-  @@unique([discordId, weekKey, dayOfWeek, hour])
+  @@unique([discordId, weekKey, dayOfWeek, hour, channelId])
 }
 
 model FrameworkUsage {
