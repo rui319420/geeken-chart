@@ -86,6 +86,10 @@ export default function PrivacySettings() {
       if (!res.ok) throw new Error("Failed");
       setMessage("保存しました");
       setTimeout(() => setMessage(""), 2000);
+      // Fix #91: 言語チャート・トレンドチャートに設定変更を通知する
+      if (key === "includePrivate" || key === "showLanguages") {
+        window.dispatchEvent(new CustomEvent("geeken:settings-changed"));
+      }
     } catch {
       setSettings({ ...settings, [key]: prev });
       setMessage("保存に失敗しました");

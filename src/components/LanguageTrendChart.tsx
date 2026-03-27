@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import {
   LineChart,
   Line,
@@ -40,7 +40,6 @@ interface DataPoint {
   [lang: string]: string | number;
 }
 
-// カスタムツールチップ
 const CustomTooltip = ({
   active,
   payload,
@@ -94,7 +93,6 @@ const CustomTooltip = ({
   );
 };
 
-// カスタム凡例
 const CustomLegend = ({
   payload,
   hiddenLines,
@@ -157,8 +155,8 @@ export default function LanguageTrendChart() {
   const [mode, setMode] = useState<TrendMode>("total");
   const [includePrivate, setIncludePrivate] = useState<boolean | null>(null);
 
-  // 1. 設定取得
-  useEffect(() => {
+  // Fix #91: 設定フェッチを関数化
+  const fetchSettings = useCallback(() => {
     fetch("/api/user/settings", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((s: { includePrivate?: boolean } | null) =>
@@ -166,7 +164,17 @@ export default function LanguageTrendChart() {
       );
   }, []);
 
-  // 2. データ取得（設定 or モード変更時）
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
+
+  // Fix #91: PrivacySettings から dispatch される設定変更イベントを購読する
+  useEffect(() => {
+    const handler = () => fetchSettings();
+    window.addEventListener("geeken:settings-changed", handler);
+    return () => window.removeEventListener("geeken:settings-changed", handler);
+  }, [fetchSettings]);
+
   useEffect(() => {
     if (includePrivate === null) return;
 
@@ -213,7 +221,6 @@ export default function LanguageTrendChart() {
 
   return (
     <div className="w-full rounded-xl border border-[#2ea043]/40 bg-[#0d1117] p-5 shadow-[0_0_20px_rgba(46,160,67,0.15)] md:p-6">
-      {/* ヘッダー */}
       <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
         <div>
           <h3 className="text-base font-bold text-[#e6edf3]">人気言語の推移</h3>
@@ -240,7 +247,6 @@ export default function LanguageTrendChart() {
             </span>
           )}
 
-          {/* モード切替トグル */}
           <div className="flex items-center gap-2 rounded-lg bg-black/40 p-1">
             <button
               onClick={() => setMode("total")}
@@ -284,7 +290,6 @@ export default function LanguageTrendChart() {
         </div>
       </div>
 
-      {/* グラフ */}
       <div style={{ height: 320, width: "100%" }}>
         {loading ? (
           <div className="flex h-full items-center justify-center">

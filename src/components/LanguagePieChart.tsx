@@ -144,7 +144,8 @@ export default function LanguagePieChart() {
     [activeIndex],
   );
 
-  useEffect(() => {
+  // Fix #91: 設定フェッチを関数化してイベントリスナーからも呼べるようにする
+  const fetchSettings = useCallback(() => {
     fetch("/api/user/settings", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((s) =>
@@ -154,6 +155,17 @@ export default function LanguagePieChart() {
         }),
       );
   }, []);
+
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
+
+  // Fix #91: PrivacySettings から dispatch される設定変更イベントを購読する
+  useEffect(() => {
+    const handler = () => fetchSettings();
+    window.addEventListener("geeken:settings-changed", handler);
+    return () => window.removeEventListener("geeken:settings-changed", handler);
+  }, [fetchSettings]);
 
   useEffect(() => {
     if (!settings) return;

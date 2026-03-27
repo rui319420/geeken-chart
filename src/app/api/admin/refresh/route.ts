@@ -37,6 +37,23 @@ interface PrefetchedData {
 }
 
 // ──────────────────────────────────────────────────────────────────
+// Fix #92: 正しい discord:heatmap キーを計算するヘルパー
+// ──────────────────────────────────────────────────────────────────
+
+function getDiscordHeatmapCacheKey(offsetWeeks = 0): string {
+  const jst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const day = jst.getUTCDay();
+  const monday = new Date(jst);
+  monday.setUTCDate(jst.getUTCDate() - ((day + 6) % 7) + offsetWeeks * 7);
+  const year = monday.getUTCFullYear();
+  const startOfYear = new Date(Date.UTC(year, 0, 1));
+  const weekNo = Math.ceil(
+    ((monday.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getUTCDay() + 1) / 7,
+  );
+  return `discord:heatmap:${year}-W${String(weekNo).padStart(2, "0")}`;
+}
+
+// ──────────────────────────────────────────────────────────────────
 // リポジトリ一覧 + 全言語データを1回だけ取得してまとめて返す
 // ──────────────────────────────────────────────────────────────────
 
@@ -172,10 +189,7 @@ export async function POST(request: Request) {
 
         const { repos, languageMap } = prefetched;
 
-        // ── 1. 言語データ保存（deleteMany + createMany をトランザクションで一括） ──
-        //
-        // deleteMany に成功して createMany が失敗すると言語データが消えたままになるため、
-        // $transaction でまとめることでどちらかが失敗した場合に両方ロールバックする。
+        // ── 1. 言語データ保存 ──────────────────────────────────────
         try {
           const stats = aggregateLanguages(languageMap);
           const top20 = stats.slice(0, 20);
@@ -197,11 +211,7 @@ export async function POST(request: Request) {
           result.error = appendError(result.error, `languages: ${errorMsg(e)}`);
         }
 
-        // ── 2. 言語ヒストリー保存（複数 upsert をトランザクションで一括） ──────────
-        //
-        // 月数 × 言語数ぶんの upsert が途中で失敗すると、
-        // 一部の月だけ保存された不整合なスナップショットが残る。
-        // interactive transaction でまとめることで全成功 or 全ロールバックを保証する。
+        // ── 2. 言語ヒストリー保存 ──────────────────────────────────
         try {
           const historicalSnapshots = await buildHistoricalSnapshots(githubName, token, {
             monthsBack: 12,
@@ -234,7 +244,7 @@ export async function POST(request: Request) {
           result.error = appendError(result.error, `history: ${errorMsg(e)}`);
         }
 
-        // ── 3. コントリビューション保存（Redis のみ、DBトランザクション不要） ────────
+        // ── 3. コントリビューション保存 ────────────────────────────
         try {
           const contribToken = oauthToken ?? FALLBACK_TOKEN;
           const data = await getContributionData(githubName, contribToken);
@@ -249,7 +259,7 @@ export async function POST(request: Request) {
           result.error = appendError(result.error, `contributions: ${errorMsg(e)}`);
         }
 
-        // ── 4. GitHub Stats 保存（単一 update のため元々アトミック、変更なし） ────────
+        // ── 4. GitHub Stats 保存 ───────────────────────────────────
         try {
           const stats = await fetchUserGitHubStats(githubName, token);
           const score = calculateGitHubScore(stats);
@@ -270,26 +280,24 @@ export async function POST(request: Request) {
           result.error = appendError(result.error, `stats: ${errorMsg(e)}`);
         }
 
-        // ── 5. フレームワーク保存（deleteMany + createMany をトランザクションで一括） ──
-        //
-        // Step 1 と同様に、delete 後に create が失敗するとフレームワークデータが消える。
-        // $transaction でまとめることでロールバックを保証する。
+        // ── 5. フレームワーク保存 ──────────────────────────────────
+        // Fix #93: frameworkStats が空でも deleteMany を必ず実行して古いデータを消す
         try {
           const frameworkStats = await getUserFrameworkStats(githubName, token, 5, repos);
 
-          if (frameworkStats.length > 0) {
-            await prisma.$transaction([
-              prisma.frameworkUsage.deleteMany({ where: { userId: user.id } }),
-              prisma.frameworkUsage.createMany({
+          await prisma.$transaction(async (tx) => {
+            await tx.frameworkUsage.deleteMany({ where: { userId: user.id } });
+            if (frameworkStats.length > 0) {
+              await tx.frameworkUsage.createMany({
                 data: frameworkStats.map((f) => ({
                   userId: user.id,
                   framework: f.framework,
                   ecosystem: f.ecosystem,
                   repoCount: f.repoCount,
                 })),
-              }),
-            ]);
-          }
+              });
+            }
+          });
 
           result.frameworks = frameworkStats.length;
         } catch (e) {
@@ -303,12 +311,22 @@ export async function POST(request: Request) {
   );
 
   // ── 集計キャッシュをクリア ──────────────────────────────────────
+  // Fix #92: 正しいキーを削除する
+  //   - discord:heatmap は動的キー（週ごと）なので今週・先週分を削除
+  //   - languages:trend:average も削除（以前は total のみだった）
+  //   - discord:trend の全period キーも削除
   await Promise.all([
     redis.del("stats:dashboard"),
     redis.del("languages:all:aggregated:total:v7"),
     redis.del("languages:all:aggregated:average:v7"),
     redis.del("languages:trend:total"),
-    redis.del("discord:heatmap:aggregated"),
+    redis.del("languages:trend:average"), // Fix #92: 追加
+    redis.del(getDiscordHeatmapCacheKey(0)), // Fix #92: 今週
+    redis.del(getDiscordHeatmapCacheKey(-1)), // Fix #92: 先週
+    redis.del("discord:trend:24h:v5"), // Fix #92: 正しいキー
+    redis.del("discord:trend:1w:v5"),
+    redis.del("discord:trend:1m:v5"),
+    redis.del("discord:trend:1y:v5"),
     redis.del("frameworks:all:aggregated"),
     ...users.map((u) => redis.del(`repos:count:${u.githubName}`)),
   ]);
