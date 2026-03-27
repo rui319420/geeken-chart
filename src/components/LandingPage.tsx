@@ -3,116 +3,13 @@
 import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 
-interface StatsData {
-  members: number;
-  commits: number;
-  languages: number;
-  repositories: number;
-}
-
-interface LangData {
-  name: string;
-  bytes: number;
-  percentage: number;
-}
-
-interface ContribDay {
-  date: string;
-  count: number;
-  level: 0 | 1 | 2 | 3 | 4;
-}
-
-const GITHUB_LANGUAGE_COLORS: Record<string, string> = {
-  TypeScript: "#3178c6",
-  JavaScript: "#f1e05a",
-  Python: "#3572A5",
-  C: "#555555",
-  "C++": "#f34b7d",
-  "C#": "#178600",
-  Java: "#b07219",
-  Go: "#00ADD8",
-  Rust: "#dea584",
-  Ruby: "#701516",
-  PHP: "#4F5D95",
-  Swift: "#F05138",
-  Kotlin: "#A97BFF",
-  Dart: "#00B4AB",
-  HTML: "#e34c26",
-  CSS: "#563d7c",
-  Shell: "#89e051",
-  Vue: "#42b883",
-};
-
-function getColor(name: string): string {
-  if (GITHUB_LANGUAGE_COLORS[name]) return GITHUB_LANGUAGE_COLORS[name];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  const c = Math.floor(Math.abs(((Math.sin(hash) * 10000) % 1) * 16777215)).toString(16);
-  return "#" + "000000".substring(0, 6 - c.length) + c;
-}
-
-// 実データを使ったミニコントリビューションヒートマップ
-function ContribMini({ data }: { data: ContribDay[] }) {
-  const COLORS = ["#161b22", "#0e4429", "#006d32", "#26a641", "#39d353"];
-  // 直近182日（26週）に絞る
-  const recent = data.slice(-182);
-  if (recent.length === 0) {
-    return (
-      <div style={{ height: 80, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <span style={{ color: "#484f58", fontSize: 11, fontFamily: "sans-serif" }}>
-          データを取得中...
-        </span>
-      </div>
-    );
-  }
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(26, 1fr)", gap: 3 }}>
-      {recent.map((d, i) => (
-        <div
-          key={i}
-          title={`${d.date}: ${d.count}`}
-          style={{
-            width: 10,
-            height: 10,
-            borderRadius: 2,
-            background: COLORS[d.level],
-            opacity: 0.9,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
 export default function LandingPage() {
   const [loaded, setLoaded] = useState(false);
   const [hovered, setHovered] = useState(false);
-  const [stats, setStats] = useState<StatsData | null>(null);
-  const [langs, setLangs] = useState<LangData[]>([]);
-  const [contrib, setContrib] = useState<ContribDay[]>([]);
 
   useEffect(() => {
     setTimeout(() => setLoaded(true), 100);
-    fetch("/api/stats")
-      .then((r) => r.json())
-      .then((d: StatsData) => setStats(d))
-      .catch(() => {});
-    fetch("/api/languages/all")
-      .then((r) => r.json())
-      .then((d: LangData[]) => setLangs(d.slice(0, 5)))
-      .catch(() => {});
-    fetch("/api/contributions/all")
-      .then((r) => r.json())
-      .then((d: ContribDay[]) => setContrib(d))
-      .catch(() => {});
   }, []);
-
-  const statItems = [
-    { label: "メンバー", value: stats?.members.toString() ?? "–", unit: "人" },
-    { label: "総コミット数", value: stats?.commits.toLocaleString() ?? "–", unit: "" },
-    { label: "使用言語", value: stats?.languages.toString() ?? "–", unit: "種" },
-    { label: "リポジトリ", value: stats?.repositories.toString() ?? "–", unit: "個" },
-  ];
 
   const dots = Array.from({ length: 80 }, (_, i) => ({
     x: (i * 137.508) % 100,

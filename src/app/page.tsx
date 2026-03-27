@@ -9,7 +9,6 @@ import LanguageTrendChart from "@/components/LanguageTrendChart";
 import RefreshButton from "@/components/RefreshButton";
 import DiscordHeatmap from "@/components/DiscordHeatmap";
 import RadioNav from "@/components/RadioNav";
-import SurveyWidget from "@/components/SurveyWidget";
 import AiModelPieChart from "@/components/AiModelPieChart";
 import PageShell from "@/components/PageShell";
 import DiscordTrendChart from "@/components/DiscordTrendChart";

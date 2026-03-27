@@ -375,7 +375,8 @@ export default function SurveyWidget() {
         if (updated.count <= 0) list.splice(idx, 1);
         else list[idx] = updated;
       }
-      const { [category]: _, ...rest } = prev.myAnswers;
+      const rest = { ...prev.myAnswers };
+      delete rest[category];
       return { aggregated: { ...prev.aggregated, [category]: list }, myAnswers: rest };
     });
 

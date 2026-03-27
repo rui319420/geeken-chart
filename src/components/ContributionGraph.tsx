@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
+import Image from "next/image";
 import {
   LineChart,
   Line,
@@ -82,9 +83,11 @@ const TopUserAvatar = ({ topUser, size = 20 }: { topUser: TopUser; size?: number
     );
   }
   return (
-    <img
+    <Image
       src={topUser.avatarUrl}
       alt={topUser.displayName || "User"}
+      width={size}
+      height={size}
       style={{ width: size, height: size, borderRadius: "50%", border: "1px solid #484f58" }}
     />
   );
