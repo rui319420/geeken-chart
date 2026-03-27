@@ -78,7 +78,19 @@ const client = new Client({
     Partials.GuildMember,
     Partials.Reaction,   // キャッシュ外メッセージへのリアクションも補足
   ],
+  presence: {
+    status: "invisible",
+    activities: [],
+  },
 });
+
+function applyInvisiblePresence() {
+  if (!client.user) return;
+  client.user.setPresence({
+    status: "invisible",
+    activities: [],
+  });
+}
 
 // ──────────────────────────────────────
 // スラッシュコマンド定義
@@ -295,7 +307,7 @@ async function pollOnlineMembers(): Promise<void> {
 // ──────────────────────────────────────
 
 client.once(Events.ClientReady, async (readyClient) => {
-  readyClient.user.setPresence({ status: "invisible" });
+  applyInvisiblePresence();
   console.log(`[Bot] ログイン完了: ${readyClient.user.tag}`);
   await registerCommands();
 
@@ -309,6 +321,15 @@ client.once(Events.ClientReady, async (readyClient) => {
 
   await pollOnlineMembers();
   setInterval(pollOnlineMembers, POLL_INTERVAL_MS);
+});
+
+// 再接続時に presence が戻るケースに備えて、都度 invisible を再適用する
+client.on(Events.ShardReady, () => {
+  applyInvisiblePresence();
+});
+
+client.on(Events.ShardResume, () => {
+  applyInvisiblePresence();
 });
 
 // ──────────────────────────────────────
