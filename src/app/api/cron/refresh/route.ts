@@ -15,6 +15,20 @@ import pLimit from "p-limit";
 
 export const maxDuration = 300;
 
+// Fix #92: 正しい discord:heatmap キーを計算するヘルパー
+function getDiscordHeatmapCacheKey(offsetWeeks = 0): string {
+  const jst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const day = jst.getUTCDay();
+  const monday = new Date(jst);
+  monday.setUTCDate(jst.getUTCDate() - ((day + 6) % 7) + offsetWeeks * 7);
+  const year = monday.getUTCFullYear();
+  const startOfYear = new Date(Date.UTC(year, 0, 1));
+  const weekNo = Math.ceil(
+    ((monday.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getUTCDay() + 1) / 7,
+  );
+  return `discord:heatmap:${year}-W${String(weekNo).padStart(2, "0")}`;
+}
+
 // Vercel Cron は Authorization: Bearer <CRON_SECRET> を付けてリクエストする
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -144,18 +158,21 @@ export async function GET(request: Request) {
           });
 
           // 5. フレームワーク → FrameworkUsage
+          // Fix #93: frameworkStats が空でも deleteMany を必ず実行して古いデータを消す
           const frameworkStats = await getUserFrameworkStats(githubName, token, 5, repos);
-          if (frameworkStats.length > 0) {
-            await prisma.frameworkUsage.deleteMany({ where: { userId: user.id } });
-            await prisma.frameworkUsage.createMany({
-              data: frameworkStats.map((f) => ({
-                userId: user.id,
-                framework: f.framework,
-                ecosystem: f.ecosystem,
-                repoCount: f.repoCount,
-              })),
-            });
-          }
+          await prisma.$transaction(async (tx) => {
+            await tx.frameworkUsage.deleteMany({ where: { userId: user.id } });
+            if (frameworkStats.length > 0) {
+              await tx.frameworkUsage.createMany({
+                data: frameworkStats.map((f) => ({
+                  userId: user.id,
+                  framework: f.framework,
+                  ecosystem: f.ecosystem,
+                  repoCount: f.repoCount,
+                })),
+              });
+            }
+          });
 
           results.push({ username: githubName, ok: true });
         } catch (e) {
@@ -167,14 +184,22 @@ export async function GET(request: Request) {
     ),
   );
 
-  // 集計キャッシュをまとめてクリア
+  // Fix #92: 正しいキーをまとめてクリア
+  //   - discord:heatmap は動的キー（週ごと）なので今週・先週分を削除
+  //   - languages:trend:average も削除（以前は total のみだった）
+  //   - discord:trend の全 period キーも削除
   await Promise.all([
     redis.del("stats:dashboard"),
     redis.del("languages:all:aggregated:total:v7"),
     redis.del("languages:all:aggregated:average:v7"),
     redis.del("languages:trend:total"),
-    redis.del("languages:trend:average"),
-    redis.del("discord:heatmap:aggregated"),
+    redis.del("languages:trend:average"), // Fix #92: 追加
+    redis.del(getDiscordHeatmapCacheKey(0)), // Fix #92: 今週
+    redis.del(getDiscordHeatmapCacheKey(-1)), // Fix #92: 先週
+    redis.del("discord:trend:24h:v5"), // Fix #92: 正しいキー
+    redis.del("discord:trend:1w:v5"),
+    redis.del("discord:trend:1m:v5"),
+    redis.del("discord:trend:1y:v5"),
     redis.del("frameworks:all:aggregated"),
     ...users.map((u) => redis.del(`repos:count:${u.githubName}`)),
   ]);
