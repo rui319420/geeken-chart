@@ -230,23 +230,6 @@ export default function LanguageTrendChart() {
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          {includePrivate && (
-            <span className="flex items-center gap-1 rounded-full border border-[#388bfd]/30 bg-[#388bfd]/10 px-2.5 py-1 text-[11px] font-medium text-[#388bfd]">
-              <svg
-                width="10"
-                height="10"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-              >
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-              </svg>
-              プライベート含む
-            </span>
-          )}
-
           <div className="flex items-center gap-2 rounded-lg bg-black/40 p-1">
             <button
               onClick={() => setMode("total")}

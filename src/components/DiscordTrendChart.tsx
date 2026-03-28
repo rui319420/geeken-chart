@@ -29,14 +29,6 @@ interface TooltipPayload {
   color?: string;
 }
 
-interface TrendSummary {
-  label: string;
-  detail: string;
-  color: string;
-  border: string;
-  bg: string;
-}
-
 interface TrendApiResponse {
   points: TrendPoint[];
   hottestChannel: string | null;
@@ -46,91 +38,6 @@ interface TrendApiResponse {
 const WEEK_PERIOD = "1w";
 const WEEK_TICK_INTERVAL = 23; // 168点 → 24h ごと (7 ラベル)
 const WEEK_DOT_R = 0; // 点数が多いので非表示
-
-const TREND_UP_STRONG = 0.4;
-const TREND_UP = 0.1;
-const TREND_DOWN_STRONG = -0.4;
-
-function summarizeCurrentTrend(data: TrendPoint[]): TrendSummary {
-  if (data.length === 0) {
-    return {
-      label: "様子見",
-      detail: "まだ十分な会話データがありません",
-      color: "#8b949e",
-      border: "rgba(139,148,158,0.3)",
-      bg: "rgba(139,148,158,0.12)",
-    };
-  }
-
-  const recent = data.slice(-24);
-  const previous = data.slice(-48, -24);
-
-  const scoreOf = (point: TrendPoint) => point.messages * 2 + point.reactions * 1;
-  const recentScore = recent.reduce((sum, point) => sum + scoreOf(point), 0);
-  const prevScore = previous.reduce((sum, point) => sum + scoreOf(point), 0);
-
-  if (recentScore === 0 && prevScore === 0) {
-    return {
-      label: "静か",
-      detail: "最近は落ち着いた会話ペースです",
-      color: "#8b949e",
-      border: "rgba(139,148,158,0.3)",
-      bg: "rgba(139,148,158,0.12)",
-    };
-  }
-
-  if (prevScore === 0 && recentScore > 0) {
-    return {
-      label: "立ち上がり",
-      detail: "直近で会話が生まれ始めています",
-      color: "#57f287",
-      border: "rgba(87,242,135,0.35)",
-      bg: "rgba(87,242,135,0.12)",
-    };
-  }
-
-  const ratio = prevScore > 0 ? (recentScore - prevScore) / prevScore : 0;
-  const ratioPct = Math.round(ratio * 100);
-  const ratioText = `${ratioPct > 0 ? "+" : ""}${ratioPct}%`;
-
-  if (ratio >= TREND_UP_STRONG) {
-    return {
-      label: "急上昇",
-      detail: `前半24h比 ${ratioText}`,
-      color: "#57f287",
-      border: "rgba(87,242,135,0.35)",
-      bg: "rgba(87,242,135,0.12)",
-    };
-  }
-
-  if (ratio >= TREND_UP) {
-    return {
-      label: "上向き",
-      detail: `前半24h比 ${ratioText}`,
-      color: "#a5b4fc",
-      border: "rgba(165,180,252,0.35)",
-      bg: "rgba(165,180,252,0.12)",
-    };
-  }
-
-  if (ratio <= TREND_DOWN_STRONG) {
-    return {
-      label: "減速",
-      detail: `前半24h比 ${ratioText}`,
-      color: "#fda4af",
-      border: "rgba(253,164,175,0.35)",
-      bg: "rgba(253,164,175,0.12)",
-    };
-  }
-
-  return {
-    label: "安定",
-    detail: `前半24h比 ${ratioText}`,
-    color: "#79c0ff",
-    border: "rgba(121,192,255,0.35)",
-    bg: "rgba(121,192,255,0.12)",
-  };
-}
 
 // ─── カスタムツールチップ ────────────────────────────────────────
 const CustomTooltip = ({
@@ -239,7 +146,6 @@ export default function DiscordTrendChart() {
   const dotR = WEEK_DOT_R;
   const dotProp = dotR > 0 ? { r: dotR, strokeWidth: 0 } : false;
   const activeDot = { r: 5, stroke: "#0d1117", strokeWidth: 2 };
-  const trendSummary = summarizeCurrentTrend(data);
   const hottestChannelLabel = hottestChannel ? `#${hottestChannel}` : "データ集計中";
 
   // ボタンスタイルヘルパー
@@ -298,17 +204,16 @@ export default function DiscordTrendChart() {
               marginTop: 8,
               display: "inline-flex",
               alignItems: "center",
-              gap: 8,
+              gap: 6,
               padding: "4px 10px",
               borderRadius: 999,
-              border: `1px solid ${trendSummary.border}`,
-              background: trendSummary.bg,
+              border: "1px solid rgba(88,101,242,0.3)",
+              background: "rgba(88,101,242,0.12)",
             }}
           >
-            <span style={{ color: trendSummary.color, fontSize: 12, fontWeight: 700 }}>
-              盛り上がっているチャンネル: {hottestChannelLabel}
+            <span style={{ color: "#a5b4fc", fontSize: 12, fontWeight: 700 }}>
+              活発なチャンネル: {hottestChannelLabel}
             </span>
-            <span style={{ color: "#8b949e", fontSize: 11 }}>{trendSummary.detail}</span>
           </div>
         </div>
 
