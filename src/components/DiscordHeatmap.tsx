@@ -131,7 +131,10 @@ export default function DiscordHeatmap() {
       </div>
 
       {/* ヒートマップ本体: モバイルで横スクロール */}
-      <div className="overflow-x-auto sm:overflow-x-clip" style={{ WebkitOverflowScrolling: "touch" }}>
+      <div
+        className="overflow-x-auto sm:overflow-x-clip"
+        style={{ WebkitOverflowScrolling: "touch" }}
+      >
         <div style={{ minWidth: 296, width: "calc(100% - 10px)", margin: "0 auto" }}>
           {/* 時刻ラベル行 */}
           <div style={{ display: "grid", gridTemplateColumns: "20px 1fr", marginBottom: 3 }}>
