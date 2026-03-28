@@ -128,11 +128,12 @@ export async function syncUserStats(userId: string, githubName: string, accessTo
 }
 
 // ──────────────────────────────────────────────────────────────────
-// ログアウト時のデータ削除
+// ユーザーが明示的に要求した場合のデータ削除
+// - 通常ログアウトでは呼ばない
 // - ユーザー本体は残し、集計系データのみ削除する
 // ──────────────────────────────────────────────────────────────────
 
-export async function clearUserDataOnSignOut(userId: string) {
+export async function clearUserAggregatedData(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { githubName: true },

@@ -3,7 +3,7 @@ import GitHub from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import redis from "@/lib/redis";
-import { clearUserDataOnSignOut, syncUserLanguages, syncUserStats } from "@/services/userService";
+import { syncUserLanguages, syncUserStats } from "@/services/userService";
 import { waitUntil } from "@vercel/functions";
 import { authConfig } from "@/auth.config";
 
@@ -70,22 +70,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       }
     },
     async signOut(message) {
-      const userIdFromSession =
-        "session" in message
-          ? (message.session?.userId ??
-            (message.session as { user?: { id?: string } } | null | undefined)?.user?.id)
-          : undefined;
-
-      const userIdFromToken =
-        "token" in message
-          ? ((message.token as { id?: string; sub?: string } | null | undefined)?.id ??
-            (message.token as { id?: string; sub?: string } | null | undefined)?.sub)
-          : undefined;
-
-      const userId = userIdFromSession ?? userIdFromToken;
-      if (!userId) return;
-
-      await clearUserDataOnSignOut(userId);
+      if ("session" in message && message.session?.userId) {
+        await prisma.account.updateMany({
+          where: { userId: message.session.userId, provider: "github" },
+          data: { access_token: null },
+        });
+      }
     },
   },
 });
