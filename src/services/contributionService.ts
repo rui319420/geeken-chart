@@ -5,6 +5,8 @@ import pLimit from "p-limit";
 
 const GITHUB_TOKEN = process.env.GITHUB_ACCESS_TOKEN;
 const FETCH_CONCURRENCY = 8;
+const SYSTEM_TOKEN_CONCURRENCY = 2;
+const SYSTEM_TOKEN_RETRY_DELAY_MS = 750;
 
 type TopUserStat = {
   githubName: string;
@@ -27,7 +29,24 @@ type WeeklyStats = {
 type FetchWithFallbackResult = {
   days: { date: string; contributionCount: number }[] | null;
   userTokenAuthError: boolean;
+  fallbackAttempted: boolean;
+  fallbackSucceeded: boolean;
+  failed: boolean;
 };
+
+type ContributionSummary = {
+  totalUsers: number;
+  cacheHitUsers: number;
+  apiFetchedUsers: number;
+  skippedNoTokenUsers: number;
+  failedUsers: number;
+  fallbackAttemptedUsers: number;
+  fallbackSucceededUsers: number;
+  fallbackFailedUsers: number;
+  staleTokenUsers: number;
+};
+
+const systemTokenLimit = pLimit(SYSTEM_TOKEN_CONCURRENCY);
 
 function isAuthTokenError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
@@ -40,19 +59,68 @@ function isAuthTokenError(error: unknown): boolean {
   );
 }
 
+function isRateLimitError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const msg = error.message.toLowerCase();
+  return msg.includes("rate limit") || msg.includes("429") || msg.includes("secondary rate limit");
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchByToken(
+  githubName: string,
+  token: string,
+  year: number | null,
+  useSystemToken: boolean,
+) {
+  const doFetch = async () => getContributionData(githubName, token, year ?? undefined);
+
+  if (useSystemToken) {
+    return systemTokenLimit(async () => {
+      try {
+        return await doFetch();
+      } catch (error) {
+        if (!isRateLimitError(error)) throw error;
+        // システムトークンのレート制限時は1回だけ待ってリトライ
+        await sleep(SYSTEM_TOKEN_RETRY_DELAY_MS);
+        return doFetch();
+      }
+    });
+  }
+
+  return doFetch();
+}
+
 async function fetchContributionDaysWithFallback(
   githubName: string,
   year: number | null,
   userToken?: string,
 ): Promise<FetchWithFallbackResult> {
   const primaryToken = userToken ?? GITHUB_TOKEN;
-  if (!primaryToken) return { days: null, userTokenAuthError: false };
+  if (!primaryToken) {
+    return {
+      days: null,
+      userTokenAuthError: false,
+      fallbackAttempted: false,
+      fallbackSucceeded: false,
+      failed: false,
+    };
+  }
 
   let userTokenAuthError = false;
+  let fallbackAttempted = false;
 
   try {
-    const data = await getContributionData(githubName, primaryToken, year ?? undefined);
-    return { days: data.days, userTokenAuthError };
+    const data = await fetchByToken(githubName, primaryToken, year, !userToken);
+    return {
+      days: data.days,
+      userTokenAuthError,
+      fallbackAttempted,
+      fallbackSucceeded: false,
+      failed: false,
+    };
   } catch (primaryError) {
     if (userToken && isAuthTokenError(primaryError)) {
       userTokenAuthError = true;
@@ -60,17 +128,34 @@ async function fetchContributionDaysWithFallback(
 
     // 個人トークンで失敗した場合はシステムトークンで再試行する
     if (userToken && GITHUB_TOKEN && userToken !== GITHUB_TOKEN) {
+      fallbackAttempted = true;
       try {
-        console.warn(`[Contrib] retry with system token for ${githubName}`);
-        const retryData = await getContributionData(githubName, GITHUB_TOKEN, year ?? undefined);
-        return { days: retryData.days, userTokenAuthError };
-      } catch (retryError) {
-        console.error(`[Contrib] fallback failed for ${githubName}:`, retryError);
+        const retryData = await fetchByToken(githubName, GITHUB_TOKEN, year, true);
+        return {
+          days: retryData.days,
+          userTokenAuthError,
+          fallbackAttempted,
+          fallbackSucceeded: true,
+          failed: false,
+        };
+      } catch {
+        return {
+          days: null,
+          userTokenAuthError,
+          fallbackAttempted,
+          fallbackSucceeded: false,
+          failed: true,
+        };
       }
     }
 
-    console.error(`[Contrib] fetch failed for ${githubName}:`, primaryError);
-    return { days: null, userTokenAuthError };
+    return {
+      days: null,
+      userTokenAuthError,
+      fallbackAttempted,
+      fallbackSucceeded: false,
+      failed: true,
+    };
   }
 }
 
@@ -109,92 +194,125 @@ export async function getAggregatedContributions(year: number | null) {
   const dailyStats: Record<string, StatEntry> = {};
   const weeklyStats: Record<string, WeeklyStats> = {};
   const limit = pLimit(FETCH_CONCURRENCY);
+  const staleTokenUserIds = new Set<string>();
+  const summary: ContributionSummary = {
+    totalUsers: users.length,
+    cacheHitUsers: 0,
+    apiFetchedUsers: 0,
+    skippedNoTokenUsers: 0,
+    failedUsers: 0,
+    fallbackAttemptedUsers: 0,
+    fallbackSucceededUsers: 0,
+    fallbackFailedUsers: 0,
+    staleTokenUsers: 0,
+  };
 
   await Promise.all(
     users.map((user) =>
       limit(async () => {
-      const githubName = user.githubName;
-      if (!githubName) return;
+        const githubName = user.githubName;
+        if (!githubName) return;
 
-      const cacheKey = year
-        ? `contributions:days:${githubName}:${year}`
-        : `contributions:days:${githubName}:latest`;
+        const cacheKey = year
+          ? `contributions:days:${githubName}:${year}`
+          : `contributions:days:${githubName}:latest`;
 
-      let days = await redis.get(cacheKey);
+        let days = await redis.get(cacheKey);
 
-      if (!days) {
-        try {
-          const userToken = user.accounts[0]?.access_token ?? undefined;
-          const { days: fetchedDays, userTokenAuthError } = await fetchContributionDaysWithFallback(
-            githubName,
-            year,
-            userToken,
-          );
+        if (!days) {
+          try {
+            const userToken = user.accounts[0]?.access_token ?? undefined;
+            const { days: fetchedDays, userTokenAuthError, fallbackAttempted, fallbackSucceeded, failed } =
+              await fetchContributionDaysWithFallback(githubName, year, userToken);
 
-          if (userTokenAuthError && userToken) {
-            await prisma.account.updateMany({
-              where: { userId: user.id, provider: "github" },
-              data: { access_token: null },
-            });
-            console.warn(`[Contrib] cleared stale GitHub token for user ${user.id}`);
-          }
+            if (fallbackAttempted) summary.fallbackAttemptedUsers += 1;
+            if (fallbackSucceeded) summary.fallbackSucceededUsers += 1;
+            if (fallbackAttempted && !fallbackSucceeded) summary.fallbackFailedUsers += 1;
+            if (failed) summary.failedUsers += 1;
 
-          if (!fetchedDays) {
-            console.warn(`[Contrib] no usable token or fetch failed for ${githubName}, skip fetch`);
+            if (userTokenAuthError && userToken) {
+              staleTokenUserIds.add(user.id);
+            }
+
+            if (!fetchedDays) {
+              summary.skippedNoTokenUsers += 1;
+              return;
+            }
+
+            days = fetchedDays;
+            summary.apiFetchedUsers += 1;
+            const ttl = year ? 86400 * 30 : 86400;
+            await redis.set(cacheKey, JSON.stringify(days), { ex: ttl });
+          } catch {
+            summary.failedUsers += 1;
             return;
           }
-
-          days = fetchedDays;
-          const ttl = year ? 86400 * 30 : 86400;
-          await redis.set(cacheKey, JSON.stringify(days), { ex: ttl });
-        } catch (error) {
-          console.error(`Failed to fetch contributions for ${githubName}:`, error);
-          return;
+        } else {
+          summary.cacheHitUsers += 1;
         }
-      } else if (typeof days === "string") {
-        days = JSON.parse(days);
-      }
+        if (typeof days === "string") {
+          days = JSON.parse(days);
+        }
 
-      if (Array.isArray(days)) {
-        for (const day of days) {
-          // 日ごとの集計
-          if (!dailyStats[day.date]) {
-            dailyStats[day.date] = { date: day.date, totalCount: 0, topUser: null };
-          }
-          dailyStats[day.date].totalCount += day.contributionCount;
+        if (Array.isArray(days)) {
+          for (const day of days) {
+            // 日ごとの集計
+            if (!dailyStats[day.date]) {
+              dailyStats[day.date] = { date: day.date, totalCount: 0, topUser: null };
+            }
+            dailyStats[day.date].totalCount += day.contributionCount;
 
-          const currentTopCount = dailyStats[day.date].topUser?.count ?? 0;
-          if (day.contributionCount > currentTopCount && day.contributionCount > 0) {
-            dailyStats[day.date].topUser = {
-              githubName: user.githubName,
-              nickname: user.nickname,
-              count: day.contributionCount,
-              isAnonymous: user.isAnonymous,
-            };
-          }
-
-          // 週ごとの集計
-          const weekKey = getMonday(day.date);
-          if (!weeklyStats[weekKey]) {
-            weeklyStats[weekKey] = { totalCount: 0, users: {} };
-          }
-          weeklyStats[weekKey].totalCount += day.contributionCount;
-
-          if (day.contributionCount > 0) {
-            if (!weeklyStats[weekKey].users[user.githubName]) {
-              weeklyStats[weekKey].users[user.githubName] = {
+            const currentTopCount = dailyStats[day.date].topUser?.count ?? 0;
+            if (day.contributionCount > currentTopCount && day.contributionCount > 0) {
+              dailyStats[day.date].topUser = {
                 githubName: user.githubName,
                 nickname: user.nickname,
-                count: 0,
+                count: day.contributionCount,
                 isAnonymous: user.isAnonymous,
               };
             }
-            weeklyStats[weekKey].users[user.githubName].count += day.contributionCount;
+
+            // 週ごとの集計
+            const weekKey = getMonday(day.date);
+            if (!weeklyStats[weekKey]) {
+              weeklyStats[weekKey] = { totalCount: 0, users: {} };
+            }
+            weeklyStats[weekKey].totalCount += day.contributionCount;
+
+            if (day.contributionCount > 0) {
+              if (!weeklyStats[weekKey].users[user.githubName]) {
+                weeklyStats[weekKey].users[user.githubName] = {
+                  githubName: user.githubName,
+                  nickname: user.nickname,
+                  count: 0,
+                  isAnonymous: user.isAnonymous,
+                };
+              }
+              weeklyStats[weekKey].users[user.githubName].count += day.contributionCount;
+            }
           }
         }
-      }
       }),
     ),
+  );
+
+  if (staleTokenUserIds.size > 0) {
+    await prisma.account.updateMany({
+      where: {
+        provider: "github",
+        userId: { in: Array.from(staleTokenUserIds) },
+      },
+      data: { access_token: null },
+    });
+    summary.staleTokenUsers = staleTokenUserIds.size;
+  }
+
+  console.info(
+    JSON.stringify({
+      event: "contribution_aggregation_summary",
+      year,
+      ...summary,
+    }),
   );
 
   const dailyEntries = Object.values(dailyStats).sort(
