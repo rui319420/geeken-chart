@@ -14,8 +14,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
   providers: [
     GitHub({
-      clientId: process.env.GITHUB_ID,
-      clientSecret: process.env.GITHUB_SECRET,
+      // AUTH_GITHUB_ID があればそちらを使い、なければ GITHUB_ID を使う（両対応）
+      clientId: process.env.AUTH_GITHUB_ID || process.env.GITHUB_ID,
+      clientSecret: process.env.AUTH_GITHUB_SECRET || process.env.GITHUB_SECRET,
       authorization: {
         params: {
           scope: "read:user user:email repo",
