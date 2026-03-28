@@ -126,3 +126,55 @@ export async function syncUserStats(userId: string, githubName: string, accessTo
     console.error(`[StatsSync] ${githubName} の同期中にエラー:`, e);
   }
 }
+
+// ──────────────────────────────────────────────────────────────────
+// ユーザーが明示的に要求した場合のデータ削除
+// - 通常ログアウトでは呼ばない
+// - ユーザー本体は残し、集計系データのみ削除する
+// ──────────────────────────────────────────────────────────────────
+
+export async function clearUserAggregatedData(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { githubName: true },
+  });
+
+  await prisma.$transaction([
+    prisma.userLanguage.deleteMany({ where: { userId } }),
+    prisma.languageSnapshot.deleteMany({ where: { userId } }),
+    prisma.frameworkUsage.deleteMany({ where: { userId } }),
+    prisma.discordActivity.deleteMany({ where: { userId } }),
+    prisma.account.updateMany({
+      where: { userId, provider: "github" },
+      data: { access_token: null },
+    }),
+    prisma.user.update({
+      where: { id: userId },
+      data: {
+        totalStars: null,
+        totalCommits: null,
+        totalPRs: null,
+        totalIssues: null,
+        githubScore: null,
+        statsUpdatedAt: null,
+      },
+    }),
+  ]);
+
+  if (user?.githubName) {
+    await Promise.all([
+      redis.del(`contributions:days:${user.githubName}:latest`),
+      redis.del(`repos:count:${user.githubName}`),
+    ]);
+  }
+
+  await Promise.all([
+    redis.del(`github:reauth-required:${userId}`),
+    redis.del("stats:dashboard"),
+    redis.del("languages:all:aggregated:total:v7"),
+    redis.del("languages:all:aggregated:average:v7"),
+    redis.del("languages:trend:total"),
+    redis.del("languages:trend:average"),
+    redis.del("frameworks:all:aggregated"),
+  ]);
+}

@@ -95,5 +95,12 @@ export async function GET() {
   });
 
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
-  return NextResponse.json(user);
+
+  const reauthKey = `github:reauth-required:${session.user.id}`;
+  const reauthRequired = (await redis.get<string>(reauthKey)) === "1";
+
+  return NextResponse.json({
+    ...user,
+    githubReauthRequired: reauthRequired,
+  });
 }

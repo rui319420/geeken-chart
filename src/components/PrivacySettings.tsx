@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { useState, useEffect } from "react";
 
 interface Settings {
@@ -9,6 +9,7 @@ interface Settings {
   showLanguages: boolean;
   joinRanking: boolean;
   isAnonymous: boolean;
+  githubReauthRequired?: boolean;
 }
 
 interface ToggleProps {
@@ -60,6 +61,7 @@ export default function PrivacySettings() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [saving, setSaving] = useState<keyof Settings | null>(null);
   const [message, setMessage] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (status === "authenticated") {
@@ -95,6 +97,26 @@ export default function PrivacySettings() {
       setMessage("保存に失敗しました");
     } finally {
       setSaving(null);
+    }
+  };
+
+  const handleDeleteDataAndSignOut = async () => {
+    const ok = window.confirm(
+      "この操作であなたの集計データ（言語・スナップショット・統計・草グラフキャッシュ）が削除されます。続行しますか？",
+    );
+    if (!ok) return;
+
+    setDeleting(true);
+    setMessage("");
+
+    try {
+      const res = await fetch("/api/user/delete-and-signout", { method: "POST" });
+      if (!res.ok) throw new Error("Failed");
+
+      await signOut({ callbackUrl: "/" });
+    } catch {
+      setMessage("データ削除に失敗しました");
+      setDeleting(false);
     }
   };
 
@@ -141,6 +163,15 @@ export default function PrivacySettings() {
         </div>
       ) : (
         <div className="divide-y divide-white/4">
+          {settings.githubReauthRequired && (
+            <div className="mb-3 rounded-lg border border-amber-400/30 bg-amber-400/10 p-3">
+              <p className="text-xs text-amber-100">
+                GitHub
+                連携トークンの有効期限が切れている可能性があります。草グラフ・コミット推移の反映のため、
+                一度ログアウトして GitHub で再ログインしてください。
+              </p>
+            </div>
+          )}
           <Toggle
             id="includePrivate"
             label="プライベートリポジトリを含める"
@@ -195,6 +226,20 @@ export default function PrivacySettings() {
           </p>
         </div>
       )}
+
+      <div className="mt-4 rounded-lg border border-red-400/30 bg-red-500/10 p-3">
+        <p className="text-xs text-red-100">
+          必要に応じて、あなたの集計データを削除したうえでログアウトできます。
+        </p>
+        <button
+          type="button"
+          onClick={handleDeleteDataAndSignOut}
+          disabled={deleting}
+          className="mt-2 rounded-md border border-red-400/40 bg-red-500/20 px-3 py-1.5 text-xs font-semibold text-red-100 transition hover:bg-red-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {deleting ? "処理中..." : "データを消してログアウト"}
+        </button>
+      </div>
     </div>
   );
 }

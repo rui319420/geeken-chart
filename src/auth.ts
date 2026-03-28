@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import GitHub from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
+import redis from "@/lib/redis";
 import { syncUserLanguages, syncUserStats } from "@/services/userService";
 import { waitUntil } from "@vercel/functions";
 import { authConfig } from "@/auth.config";
@@ -54,6 +55,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             where: { userId: userId, provider: "github" },
             data: { access_token: account.access_token },
           });
+
+          await redis.del(`github:reauth-required:${userId}`);
         }
 
         const githubName = profile.login as string;
