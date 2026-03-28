@@ -1,8 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { getContributionData } from "@/lib/github-graphql";
 import redis from "@/lib/redis";
+import pLimit from "p-limit";
 
 const GITHUB_TOKEN = process.env.GITHUB_ACCESS_TOKEN;
+const FETCH_CONCURRENCY = 8;
 
 type TopUserStat = {
   githubName: string;
@@ -21,6 +23,56 @@ type WeeklyStats = {
   totalCount: number;
   users: Record<string, TopUserStat>;
 };
+
+type FetchWithFallbackResult = {
+  days: { date: string; contributionCount: number }[] | null;
+  userTokenAuthError: boolean;
+};
+
+function isAuthTokenError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const msg = error.message.toLowerCase();
+  return (
+    msg.includes("401") ||
+    msg.includes("403") ||
+    msg.includes("bad credentials") ||
+    msg.includes("resource not accessible")
+  );
+}
+
+async function fetchContributionDaysWithFallback(
+  githubName: string,
+  year: number | null,
+  userToken?: string,
+): Promise<FetchWithFallbackResult> {
+  const primaryToken = userToken ?? GITHUB_TOKEN;
+  if (!primaryToken) return { days: null, userTokenAuthError: false };
+
+  let userTokenAuthError = false;
+
+  try {
+    const data = await getContributionData(githubName, primaryToken, year ?? undefined);
+    return { days: data.days, userTokenAuthError };
+  } catch (primaryError) {
+    if (userToken && isAuthTokenError(primaryError)) {
+      userTokenAuthError = true;
+    }
+
+    // 個人トークンで失敗した場合はシステムトークンで再試行する
+    if (userToken && GITHUB_TOKEN && userToken !== GITHUB_TOKEN) {
+      try {
+        console.warn(`[Contrib] retry with system token for ${githubName}`);
+        const retryData = await getContributionData(githubName, GITHUB_TOKEN, year ?? undefined);
+        return { days: retryData.days, userTokenAuthError };
+      } catch (retryError) {
+        console.error(`[Contrib] fallback failed for ${githubName}:`, retryError);
+      }
+    }
+
+    console.error(`[Contrib] fetch failed for ${githubName}:`, primaryError);
+    return { days: null, userTokenAuthError };
+  }
+}
 
 // 指定した日付が属する週の「月曜日」を返す関数
 function getMonday(dateStr: string) {
@@ -42,6 +94,7 @@ export async function getAggregatedContributions(year: number | null) {
   const users = await prisma.user.findMany({
     where: { showCommits: true },
     select: {
+      id: true,
       githubName: true,
       isAnonymous: true,
       nickname: true,
@@ -55,9 +108,11 @@ export async function getAggregatedContributions(year: number | null) {
 
   const dailyStats: Record<string, StatEntry> = {};
   const weeklyStats: Record<string, WeeklyStats> = {};
+  const limit = pLimit(FETCH_CONCURRENCY);
 
   await Promise.all(
-    users.map(async (user) => {
+    users.map((user) =>
+      limit(async () => {
       const githubName = user.githubName;
       if (!githubName) return;
 
@@ -70,15 +125,26 @@ export async function getAggregatedContributions(year: number | null) {
       if (!days) {
         try {
           const userToken = user.accounts[0]?.access_token ?? undefined;
-          const token = userToken ?? GITHUB_TOKEN;
+          const { days: fetchedDays, userTokenAuthError } = await fetchContributionDaysWithFallback(
+            githubName,
+            year,
+            userToken,
+          );
 
-          if (!token) {
-            console.warn(`[Contrib] token missing for ${githubName}, skip fetch`);
+          if (userTokenAuthError && userToken) {
+            await prisma.account.updateMany({
+              where: { userId: user.id, provider: "github" },
+              data: { access_token: null },
+            });
+            console.warn(`[Contrib] cleared stale GitHub token for user ${user.id}`);
+          }
+
+          if (!fetchedDays) {
+            console.warn(`[Contrib] no usable token or fetch failed for ${githubName}, skip fetch`);
             return;
           }
 
-          const data = await getContributionData(githubName, token, year ?? undefined);
-          days = data.days;
+          days = fetchedDays;
           const ttl = year ? 86400 * 30 : 86400;
           await redis.set(cacheKey, JSON.stringify(days), { ex: ttl });
         } catch (error) {
@@ -127,7 +193,8 @@ export async function getAggregatedContributions(year: number | null) {
           }
         }
       }
-    }),
+      }),
+    ),
   );
 
   const dailyEntries = Object.values(dailyStats).sort(
