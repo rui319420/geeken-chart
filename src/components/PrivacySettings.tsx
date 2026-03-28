@@ -28,11 +28,6 @@ function Toggle({ id, label, description, checked, onChange, disabled, highlight
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <p className="text-sm font-medium text-[#e6edf3]">{label}</p>
-          {highlight && (
-            <span className="rounded bg-[#388bfd]/15 px-1.5 py-0.5 text-[10px] font-medium text-[#388bfd]">
-              NEW
-            </span>
-          )}
         </div>
         <p className="mt-0.5 text-xs text-[#636e7b]">{description}</p>
       </div>
@@ -213,17 +208,6 @@ export default function PrivacySettings() {
             onChange={(v) => update("isAnonymous", v)}
             disabled={saving === "isAnonymous"}
           />
-        </div>
-      )}
-
-      {settings?.includePrivate && (
-        <div className="mt-3 rounded-lg border border-[#388bfd]/20 bg-[#388bfd]/5 p-3">
-          <p className="text-xs text-[#8b949e]">
-            <span className="font-medium text-[#388bfd]">ℹ プライベートリポジトリ有効</span>
-            <br />
-            「今すぐ更新」を実行するとプライベートリポジトリのデータも取得されます。
-            あなたのデータのみ更新されます（他のメンバーには影響しません）。
-          </p>
         </div>
       )}
 
