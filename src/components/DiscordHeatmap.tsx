@@ -131,10 +131,13 @@ export default function DiscordHeatmap() {
       </div>
 
       {/* ヒートマップ本体: モバイルで横スクロール */}
-      <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: "touch" }}>
-        <div style={{ minWidth: 320 }}>
+      <div
+        className="overflow-x-auto sm:overflow-x-clip"
+        style={{ WebkitOverflowScrolling: "touch" }}
+      >
+        <div style={{ minWidth: 296, width: "calc(100% - 10px)", margin: "0 auto" }}>
           {/* 時刻ラベル行 */}
-          <div style={{ display: "grid", gridTemplateColumns: "22px 1fr", marginBottom: 3 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "20px 1fr", marginBottom: 3 }}>
             <div />
             <div style={{ position: "relative", height: 20 }}>
               {/* モバイルは間引いた目盛り、デスクトップは細かい目盛り */}
@@ -179,7 +182,7 @@ export default function DiscordHeatmap() {
           {DAY_LABELS.map((dayLabel, d) => (
             <div
               key={d}
-              style={{ display: "grid", gridTemplateColumns: "22px 1fr", gap: 3, marginBottom: 2 }}
+              style={{ display: "grid", gridTemplateColumns: "20px 1fr", gap: 3, marginBottom: 2 }}
             >
               <div
                 style={{
@@ -194,7 +197,7 @@ export default function DiscordHeatmap() {
                 {dayLabel}
               </div>
 
-              <div style={{ display: "flex", gap: 2 }}>
+              <div style={{ display: "flex", gap: 1 }}>
                 {Array.from({ length: 24 }, (_, h) => {
                   const norm = loading ? 0 : display.normalized[d][h];
                   const count = loading ? 0 : display.matrix[d][h];
