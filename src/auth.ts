@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import GitHub from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
-import { syncUserLanguages } from "@/services/userService";
+import { syncUserLanguages, syncUserStats } from "@/services/userService";
 import { waitUntil } from "@vercel/functions";
 import { authConfig } from "@/auth.config";
 
@@ -14,8 +14,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
   providers: [
     GitHub({
-      clientId: process.env.GITHUB_ID,
-      clientSecret: process.env.GITHUB_SECRET,
+      // AUTH_GITHUB_ID があればそちらを使い、なければ GITHUB_ID を使う（両対応）
+      clientId: process.env.AUTH_GITHUB_ID || process.env.GITHUB_ID,
+      clientSecret: process.env.AUTH_GITHUB_SECRET || process.env.GITHUB_SECRET,
       authorization: {
         params: {
           scope: "read:user user:email repo",
@@ -57,7 +58,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         const githubName = profile.login as string;
         const userToken = account.access_token;
-        waitUntil(syncUserLanguages(userId, githubName, userToken).catch(console.error));
+        waitUntil(
+          Promise.all([
+            syncUserLanguages(userId, githubName, userToken),
+            syncUserStats(userId, githubName, userToken),
+          ]).catch(console.error),
+        );
       }
     },
     async signOut(message) {
