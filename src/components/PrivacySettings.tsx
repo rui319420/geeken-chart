@@ -145,7 +145,8 @@ export default function PrivacySettings() {
           {settings.githubReauthRequired && (
             <div className="mb-3 rounded-lg border border-amber-400/30 bg-amber-400/10 p-3">
               <p className="text-xs text-amber-100">
-                GitHub 連携トークンの有効期限が切れている可能性があります。草グラフ・コミット推移の反映のため、
+                GitHub
+                連携トークンの有効期限が切れている可能性があります。草グラフ・コミット推移の反映のため、
                 一度ログアウトして GitHub で再ログインしてください。
               </p>
             </div>
