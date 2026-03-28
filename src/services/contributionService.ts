@@ -39,13 +39,18 @@ function getMonday(dateStr: string) {
  * コミットデータを取得し、日ごと・週ごとのMVPを集計する
  */
 export async function getAggregatedContributions(year: number | null) {
-  if (!GITHUB_TOKEN) {
-    throw new Error("GitHub token not configured");
-  }
-
   const users = await prisma.user.findMany({
     where: { showCommits: true },
-    select: { githubName: true, isAnonymous: true, nickname: true },
+    select: {
+      githubName: true,
+      isAnonymous: true,
+      nickname: true,
+      accounts: {
+        where: { provider: "github" },
+        select: { access_token: true },
+        take: 1,
+      },
+    },
   });
 
   const dailyStats: Record<string, StatEntry> = {};
@@ -64,7 +69,15 @@ export async function getAggregatedContributions(year: number | null) {
 
       if (!days) {
         try {
-          const data = await getContributionData(githubName, GITHUB_TOKEN, year ?? undefined);
+          const userToken = user.accounts[0]?.access_token ?? undefined;
+          const token = userToken ?? GITHUB_TOKEN;
+
+          if (!token) {
+            console.warn(`[Contrib] token missing for ${githubName}, skip fetch`);
+            return;
+          }
+
+          const data = await getContributionData(githubName, token, year ?? undefined);
           days = data.days;
           const ttl = year ? 86400 * 30 : 86400;
           await redis.set(cacheKey, JSON.stringify(days), { ex: ttl });
