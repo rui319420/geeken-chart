@@ -16,12 +16,13 @@ type Member = {
   totalCommits: number | null;
   githubScore: number | null;
   joinRanking: boolean;
+  isAnonymous: boolean;
 };
 
 function MemberCard({ member }: { member: Member }) {
-  const displayName = member.nickname ?? member.githubName;
+  const displayName = member.isAnonymous ? "匿名ユーザー" : (member.nickname ?? member.githubName);
   const initial = displayName.charAt(0).toUpperCase();
-  const hasDiscord = !!member.discordId;
+  const hasDiscord = !!member.discordId && !member.isAnonymous;
 
   return (
     <Link
@@ -31,7 +32,14 @@ function MemberCard({ member }: { member: Member }) {
     >
       {/* Avatar */}
       <div className="shrink-0">
-        {member.avatarUrl ? (
+        {member.isAnonymous ? (
+          <div
+            className="flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold"
+            style={{ background: "#36393f", color: "#8b949e" }}
+          >
+            匿
+          </div>
+        ) : member.avatarUrl ? (
           <Image
             src={member.avatarUrl}
             alt={displayName}
@@ -53,26 +61,23 @@ function MemberCard({ member }: { member: Member }) {
       <div className="min-w-0 flex-1">
         <p
           className="member-name truncate text-[14px] leading-4.5 font-medium"
-          style={{ color: "#c9d1d9" }}
+          style={{ color: member.isAnonymous ? "#8b949e" : "#c9d1d9" }}
         >
           {displayName}
         </p>
         <p className="truncate text-[11px] leading-3.5" style={{ color: "#636e7b" }}>
-          @{member.githubName}
-          {hasDiscord && (
-            <span className="ml-1.5" style={{ color: "#818cf8" }}>
-              · Discord連携済み
-            </span>
+          {!member.isAnonymous && (
+            <>
+              @{member.githubName}
+              {hasDiscord && (
+                <span className="ml-1.5" style={{ color: "#818cf8" }}>
+                  · Discord連携済み
+                </span>
+              )}
+            </>
           )}
         </p>
       </div>
-
-      {/* スコア */}
-      {member.joinRanking && member.githubScore !== null && (
-        <span className="shrink-0 text-xs font-bold tabular-nums" style={{ color: "#3fb950" }}>
-          {member.githubScore.toLocaleString()} pts
-        </span>
-      )}
     </Link>
   );
 }
@@ -91,6 +96,7 @@ export default async function MembersPage() {
       totalCommits: true,
       githubScore: true,
       joinRanking: true,
+      isAnonymous: true,
     },
     orderBy: [{ githubScore: "desc" }, { createdAt: "asc" }],
   });
