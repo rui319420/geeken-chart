@@ -9,30 +9,39 @@ import redis from "@/lib/redis";
 // ──────────────────────────────────────────────────────────────────
 
 export async function syncUserLanguages(userId: string, githubName: string, accessToken?: string) {
-  if (!accessToken || !githubName) {
+  const FALLBACK_TOKEN = process.env.GITHUB_ACCESS_TOKEN;
+  const token = accessToken ?? FALLBACK_TOKEN;
+
+  if (!token || !githubName) {
     console.warn(`[Sync] トークンまたはGitHub名がないため、${githubName} の同期をスキップします。`);
     return;
   }
 
   try {
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const languageCount = await prisma.userLanguage.count({ where: { userId } });
+    const isInitialLanguageSync = languageCount === 0;
 
-    const recentSync = await prisma.userLanguage.findFirst({
-      where: {
-        userId: userId,
-        updatedAt: { gte: oneDayAgo },
-      },
-    });
+    if (!isInitialLanguageSync) {
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const recentSync = await prisma.userLanguage.findFirst({
+        where: {
+          userId: userId,
+          updatedAt: { gte: oneDayAgo },
+        },
+      });
 
-    if (recentSync) {
-      console.log(`[Sync] ${githubName} の言語データは24時間以内に同期済みのためスキップします。`);
-      return;
+      if (recentSync) {
+        console.log(
+          `[Sync] ${githubName} の言語データは24時間以内に同期済みのためスキップします。`,
+        );
+        return;
+      }
     }
 
     console.log(`[Sync] ${githubName} の言語データの同期を開始します...`);
 
     const report = await getUserLanguageStats(githubName, {
-      token: accessToken,
+      token,
       concurrency: 5,
     });
 
