@@ -14,7 +14,9 @@ import PageShell from "@/components/PageShell";
 import DiscordTrendChart from "@/components/DiscordTrendChart";
 
 const gitBranch = process.env.VERCEL_GIT_COMMIT_REF ?? process.env.GIT_BRANCH ?? null;
-const canRefreshDb = gitBranch !== "main";
+const isMainBranchDeployment =
+  gitBranch === "main" || (!gitBranch && process.env.VERCEL_ENV === "production");
+const canRefreshDb = !isMainBranchDeployment;
 
 function Background() {
   const dots = Array.from({ length: 80 }, (_, i) => ({

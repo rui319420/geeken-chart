@@ -234,21 +234,21 @@ export async function POST(request: Request) {
             cachedLanguages: languageMap,
           });
 
-          await prisma.$transaction(async (tx) => {
+          // upsert は冪等なのでトランザクション不要。
+          // 月ごとに分割して直列実行し、1回の Promise.all の幅を抑える。
+          for (const { month, languages } of historicalSnapshots) {
             await Promise.all(
-              historicalSnapshots.flatMap(({ month, languages }) =>
-                Object.entries(languages).map(([language, bytes]) =>
-                  tx.languageSnapshot.upsert({
-                    where: {
-                      userId_language_month: { userId: user.id, language, month },
-                    },
-                    update: { bytes },
-                    create: { userId: user.id, language, bytes, month },
-                  }),
-                ),
+              Object.entries(languages).map(([language, bytes]) =>
+                prisma.languageSnapshot.upsert({
+                  where: {
+                    userId_language_month: { userId: user.id, language, month },
+                  },
+                  update: { bytes },
+                  create: { userId: user.id, language, bytes, month },
+                }),
               ),
             );
-          });
+          }
 
           result.snapshotMonths = historicalSnapshots.length;
         } catch (e) {
