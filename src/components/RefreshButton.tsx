@@ -23,7 +23,15 @@ interface RefreshResponse {
 
 type Status = "idle" | "loading" | "done" | "error";
 
-export default function RefreshButton() {
+interface RefreshButtonProps {
+  canRefreshDb?: boolean;
+  branchName?: string | null;
+}
+
+export default function RefreshButton({
+  canRefreshDb = true,
+  branchName = null,
+}: RefreshButtonProps) {
   const [status, setStatus] = useState<Status>("idle");
   const [response, setResponse] = useState<RefreshResponse | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
@@ -33,6 +41,12 @@ export default function RefreshButton() {
   const [cacheDeleted, setCacheDeleted] = useState(0);
 
   const handleRefresh = async () => {
+    if (!canRefreshDb) {
+      setStatus("error");
+      setErrorMsg("mainブランチではDB更新は実行できません");
+      return;
+    }
+
     setStatus("loading");
     setResponse(null);
     setErrorMsg("");
@@ -103,15 +117,18 @@ export default function RefreshButton() {
           <div>
             <p className="text-sm font-semibold text-[#e6edf3]">データ手動更新</p>
             <p className="text-xs text-[#636e7b]">
-              開発用 — 全メンバーのデータを再取得してDBに保存
+              全メンバーのデータを再取得してDBに保存（mainブランチ以外）
             </p>
+            {branchName && (
+              <p className="mt-1 text-[11px] text-[#8b949e]">現在のブランチ: {branchName}</p>
+            )}
           </div>
         </div>
 
         {/* ボタン */}
         <button
           onClick={handleRefresh}
-          disabled={status === "loading"}
+          disabled={status === "loading" || !canRefreshDb}
           className="flex items-center gap-2 rounded-lg border border-[#f78166]/30 bg-[#f78166]/10 px-4 py-2 text-sm font-medium text-[#f78166] transition-all duration-200 hover:border-[#f78166]/60 hover:bg-[#f78166]/20 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {status === "loading" ? (
@@ -142,10 +159,18 @@ export default function RefreshButton() {
                 <path d="M1 4v6h6M23 20v-6h-6" />
                 <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15" />
               </svg>
-              今すぐ更新
+              {canRefreshDb ? "今すぐ更新" : "mainブランチでは無効"}
             </>
           )}
         </button>
+
+        {!canRefreshDb && (
+          <div className="mt-3 rounded-lg border border-amber-400/20 bg-amber-400/5 p-3">
+            <p className="text-xs text-amber-300">
+              安全のため、mainブランチではDB更新ボタンを無効化しています。
+            </p>
+          </div>
+        )}
 
         {/* 更新中のプログレス表示 */}
         {status === "loading" && (

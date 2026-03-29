@@ -13,7 +13,8 @@ import AiModelPieChart from "@/components/AiModelPieChart";
 import PageShell from "@/components/PageShell";
 import DiscordTrendChart from "@/components/DiscordTrendChart";
 
-const isDev = process.env.NODE_ENV === "development";
+const gitBranch = process.env.VERCEL_GIT_COMMIT_REF ?? process.env.GIT_BRANCH ?? null;
+const canRefreshDb = gitBranch !== "main";
 
 function Background() {
   const dots = Array.from({ length: 80 }, (_, i) => ({
@@ -99,12 +100,12 @@ export default async function HomePage() {
               <DiscordTrendChart />
             </section>
 
-            {isDev && (
+            {canRefreshDb && (
               <section className="mt-10 border-t border-white/5 pt-8">
                 <p className="mb-3 text-xs font-semibold tracking-widest text-[#636e7b] uppercase">
                   開発用ツール
                 </p>
-                <RefreshButton />
+                <RefreshButton branchName={gitBranch} canRefreshDb={canRefreshDb} />
               </section>
             )}
           </main>

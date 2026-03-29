@@ -4,7 +4,7 @@ import { SessionProvider } from "next-auth/react";
 
 export const metadata: Metadata = {
   title: "技研チャート",
-  description: "技術研究会のGitHub活動を可視化するダッシュボード",
+  description: "サークルの活動を可視化するダッシュボード",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
