@@ -55,7 +55,14 @@ const CLIENT_ID = process.env.DISCORD_CLIENT_ID ?? "";
 // Prisma クライアント
 // ──────────────────────────────────────
 
-const pool = new Pool({ connectionString: process.env.DIRECT_URL });
+const parsedPoolMax = Number(process.env.PG_POOL_MAX ?? process.env.PRISMA_POOL_MAX ?? "2");
+const poolMax = Number.isFinite(parsedPoolMax) && parsedPoolMax > 0 ? parsedPoolMax : 2;
+const pool = new Pool({
+  connectionString: process.env.DIRECT_URL,
+  max: poolMax,
+  idleTimeoutMillis: 10_000,
+  connectionTimeoutMillis: 15_000,
+});
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter } as any);
 
