@@ -31,6 +31,17 @@ function makeDummyData(): HeatmapData {
   return { matrix, maxVal: 1, normalized: matrix };
 }
 
+function normalizeHeatmapData(data: Partial<HeatmapData> | null | undefined): HeatmapData {
+  const fallback = makeDummyData();
+  const matrix = Array.from({ length: 7 }, (_, day) =>
+    Array.from({ length: 24 }, (_, hour) => data?.matrix?.[day]?.[hour] ?? 0),
+  );
+  const normalized = Array.from({ length: 7 }, (_, day) =>
+    Array.from({ length: 24 }, (_, hour) => data?.normalized?.[day]?.[hour] ?? 0),
+  );
+  return { matrix, normalized, maxVal: data?.maxVal ?? fallback.maxVal };
+}
+
 export default function DiscordHeatmap() {
   const [week, setWeek] = useState<Week>("current");
   const [dataMap, setDataMap] = useState<Partial<Record<Week, HeatmapData>>>({});
@@ -49,7 +60,7 @@ export default function DiscordHeatmap() {
     const url = w === "last" ? "/api/discord/heatmap?week=last" : "/api/discord/heatmap";
     fetch(url)
       .then((r) => r.json())
-      .then((d: HeatmapData) => setDataMap((prev) => ({ ...prev, [w]: d })))
+      .then((d: HeatmapData) => setDataMap((prev) => ({ ...prev, [w]: normalizeHeatmapData(d) })))
       .catch((e) => console.error("Discord heatmap fetch failed:", e))
       .finally(() => setLoading(false));
   };
@@ -74,7 +85,7 @@ export default function DiscordHeatmap() {
   };
 
   const data = dataMap[week];
-  const display = data ?? makeDummyData();
+  const display = normalizeHeatmapData(data);
   const isCurrent = week === "current";
 
   return (

@@ -13,7 +13,7 @@ const poolMax = Number.isFinite(parsedPoolMax) && parsedPoolMax > 0 ? parsedPool
 const pool =
   globalForPrisma.pool ??
   new Pool({
-    connectionString: process.env.DIRECT_URL,
+    connectionString: process.env.DATABASE_URL ?? process.env.DIRECT_URL,
     max: poolMax,
     idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 15_000,
