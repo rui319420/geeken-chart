@@ -16,13 +16,9 @@ import pLimit from "p-limit";
 
 export const maxDuration = 60;
 
-function isMainBranchDeployment(): boolean {
+function isRefreshBlockedDeployment(): boolean {
   const branch = process.env.VERCEL_GIT_COMMIT_REF ?? process.env.GIT_BRANCH ?? "";
-  if (process.env.VERCEL_ENV === "production") return true;
-  if (branch) return branch === "main";
-
-  // Vercel の production 環境では main 扱いとして安全側に倒す
-  return process.env.VERCEL_ENV === "production";
+  return branch === "main" || process.env.VERCEL_ENV === "production";
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -126,7 +122,7 @@ export async function POST(request: Request) {
 }
 
 async function refresh(request: Request) {
-  if (isMainBranchDeployment()) {
+  if (isRefreshBlockedDeployment()) {
     return NextResponse.json({ error: "DB refresh is disabled on main branch" }, { status: 403 });
   }
 
