@@ -10,7 +10,7 @@ const globalForPrisma = globalThis as unknown as {
 const parsedPoolMax = Number(process.env.PG_POOL_MAX ?? process.env.PRISMA_POOL_MAX ?? "3");
 const poolMax = Number.isFinite(parsedPoolMax) && parsedPoolMax > 0 ? parsedPoolMax : 3;
 
-const pool =
+export const pool =
   globalForPrisma.pool ??
   new Pool({
     connectionString: process.env.DATABASE_URL ?? process.env.DIRECT_URL,

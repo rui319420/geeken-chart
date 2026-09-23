@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import Header from "@/components/Header";
 import RadioNav from "@/components/RadioNav";
+import DiscordLinkSettings from "@/components/DiscordLinkSettings";
 import PrivacySettings from "@/components/PrivacySettings";
 import PageShell from "@/components/PageShell";
 
@@ -20,6 +21,7 @@ export default async function SettingsPage() {
             <p className="mt-1 text-sm text-[#636e7b]">公開設定やプロフィールを管理します</p>
           </div>
           <PrivacySettings />
+          <DiscordLinkSettings />
         </main>
       </PageShell>
     </div>

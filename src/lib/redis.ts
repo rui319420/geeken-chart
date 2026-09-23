@@ -80,3 +80,9 @@ export async function withCache<T>(
 export async function invalidateCache(key: string): Promise<void> {
   await redis.del(key);
 }
+
+/** Administrative mutations must report cache failures instead of falling back. */
+export function requireRedis(): Redis {
+  if (!redisClient) throw new Error("Redis is not configured");
+  return redisClient;
+}
