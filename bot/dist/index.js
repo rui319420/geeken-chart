@@ -54,6 +54,7 @@ const client_1 = require("@prisma/client");
 const adapter_pg_1 = require("@prisma/adapter-pg");
 const pg_1 = require("pg");
 const dotenv = __importStar(require("dotenv"));
+const discord_link_1 = require("./discord-link");
 dotenv.config();
 // ──────────────────────────────────────
 // 環境変数チェック
@@ -71,7 +72,14 @@ const CLIENT_ID = process.env.DISCORD_CLIENT_ID ?? "";
 // ──────────────────────────────────────
 // Prisma クライアント
 // ──────────────────────────────────────
-const pool = new pg_1.Pool({ connectionString: process.env.DIRECT_URL });
+const parsedPoolMax = Number(process.env.PG_POOL_MAX ?? process.env.PRISMA_POOL_MAX ?? "2");
+const poolMax = Number.isFinite(parsedPoolMax) && parsedPoolMax > 0 ? parsedPoolMax : 2;
+const pool = new pg_1.Pool({
+    connectionString: process.env.DIRECT_URL,
+    max: poolMax,
+    idleTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 15_000,
+});
 const adapter = new adapter_pg_1.PrismaPg(pool);
 const prisma = new client_1.PrismaClient({ adapter });
 // ──────────────────────────────────────
@@ -113,8 +121,8 @@ const commands = [
         .setName("link")
         .setDescription("ダッシュボードにDiscordデータを表示するためにGitHubアカウントと紐付けます")
         .addStringOption((opt) => opt
-        .setName("github")
-        .setDescription("あなたの GitHub ユーザー名 (例: rui319420)")
+        .setName("code")
+        .setDescription("技研チャートの設定画面で発行した連携コード")
         .setRequired(true)),
     new discord_js_1.SlashCommandBuilder()
         .setName("unlink")
@@ -166,46 +174,12 @@ function getWeekKey(date) {
     return `${year}-W${String(weekNo).padStart(2, "0")}`;
 }
 // ──────────────────────────────────────
-// インメモリキャッシュ (DB 負荷軽減)
-// ──────────────────────────────────────
-const CACHE_TTL_MS = 10 * 60 * 1000; // 10分
-const linkedUserCache = new Map();
-const linkedUserCacheTime = new Map();
-async function getLinkedUserId(discordId) {
-    const now = Date.now();
-    if (linkedUserCache.has(discordId) &&
-        now - (linkedUserCacheTime.get(discordId) ?? 0) < CACHE_TTL_MS) {
-        return linkedUserCache.get(discordId) ?? null;
-    }
-    const user = await prisma.user.findFirst({
-        where: { discordId },
-        select: { id: true },
-    });
-    linkedUserCache.set(discordId, user?.id ?? null);
-    linkedUserCacheTime.set(discordId, now);
-    return user?.id ?? null;
-}
-// ──────────────────────────────────────
-// 活動記録ユーティリティ
+// 活動記録（連携処理とDBロックを共有）
 // ──────────────────────────────────────
 async function recordMessage(discordId, timestamp, channelId, channelName) {
     const { dayOfWeek, hour } = toJstActivity(new Date(timestamp));
     const weekKey = getWeekKey(new Date(timestamp));
-    await prisma.rawDiscordActivity.upsert({
-        where: {
-            discordId_weekKey_dayOfWeek_hour_channelId: { discordId, weekKey, dayOfWeek, hour, channelId },
-        },
-        update: { messageCount: { increment: 1 } },
-        create: { discordId, channelId, channelName, weekKey, dayOfWeek, hour, messageCount: 1 },
-    });
-    const userId = await getLinkedUserId(discordId);
-    if (userId) {
-        await prisma.discordActivity.upsert({
-            where: { userId_dayOfWeek_hour: { userId, dayOfWeek, hour } },
-            update: { messageCount: { increment: 1 } },
-            create: { userId, dayOfWeek, hour, messageCount: 1 },
-        });
-    }
+    await (0, discord_link_1.recordLinkedMessage)(pool, { discordId, weekKey, dayOfWeek, hour, channelId, channelName });
 }
 async function recordReaction(discordId, timestamp, channelId, channelName) {
     const { dayOfWeek, hour } = toJstActivity(new Date(timestamp));
@@ -344,6 +318,8 @@ client.on(discord_js_1.Events.MessageReactionAdd, async (reaction, user) => {
 client.on(discord_js_1.Events.InteractionCreate, async (interaction) => {
     if (!interaction.isChatInputCommand())
         return;
+    if (interaction.guildId !== GUILD_ID)
+        return;
     try {
         switch (interaction.commandName) {
             case "link":
@@ -357,8 +333,8 @@ client.on(discord_js_1.Events.InteractionCreate, async (interaction) => {
                 break;
         }
     }
-    catch (err) {
-        console.error(`[Bot] コマンドエラー (${interaction.commandName}):`, err);
+    catch {
+        console.error("[Bot] コマンド処理に失敗しました");
         const msg = "エラーが発生しました。しばらく経ってからもう一度お試しください。";
         if (interaction.replied || interaction.deferred) {
             await interaction.followUp({ content: msg, ephemeral: true });
@@ -371,62 +347,28 @@ client.on(discord_js_1.Events.InteractionCreate, async (interaction) => {
 // /link ─────────────────────────────────
 async function handleLink(interaction) {
     await interaction.deferReply({ ephemeral: true });
-    const githubName = interaction.options.getString("github", true).trim();
-    const discordId = interaction.user.id;
-    if (!/^[a-zA-Z0-9]([a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?$/.test(githubName)) {
-        await interaction.editReply("❌ GitHub ユーザー名の形式が正しくありません。");
+    const code = interaction.options.getString("code");
+    if (!code) {
+        await interaction.editReply("設定画面でコードを発行し、/link code:<コード> を実行してください。");
         return;
     }
-    const user = await prisma.user.findFirst({
-        where: { githubName: { equals: githubName, mode: "insensitive" } },
-        select: { id: true, githubName: true, discordId: true },
-    });
-    if (!user) {
-        await interaction.editReply(`❌ **${githubName}** は技研チャートに未登録です。\n` +
-            `先に <https://geeken-chart.vercel.app> で GitHub ログインしてください。`);
-        return;
+    try {
+        const linked = await (0, discord_link_1.consumeLinkCode)(pool, interaction.user.id, code.trim());
+        await interaction.editReply(`✅ **${linked.githubName}** と連携しました！`);
     }
-    if (user.discordId && user.discordId !== discordId) {
-        await interaction.editReply("❌ このGitHubアカウントはすでに別のDiscordアカウントと紐付け済みです。");
-        return;
+    catch (error) {
+        if (!(error instanceof discord_link_1.LinkError))
+            throw error;
+        await interaction.editReply(error.message);
     }
-    const raw = await prisma.rawDiscordActivity.findMany({ where: { discordId } });
-    if (raw.length > 0) {
-        await Promise.all(raw.map((r) => prisma.discordActivity.upsert({
-            where: {
-                userId_dayOfWeek_hour: { userId: user.id, dayOfWeek: r.dayOfWeek, hour: r.hour },
-            },
-            update: { messageCount: { increment: r.messageCount } },
-            create: {
-                userId: user.id,
-                dayOfWeek: r.dayOfWeek,
-                hour: r.hour,
-                messageCount: r.messageCount,
-            },
-        })));
-    }
-    await prisma.user.update({ where: { id: user.id }, data: { discordId } });
-    linkedUserCache.set(discordId, user.id);
-    linkedUserCacheTime.set(discordId, Date.now());
-    await interaction.editReply(`✅ **${user.githubName}** と紐付けました！\n` +
-        `これまでの活動データ（${raw.length} 件）もダッシュボードに反映されました。`);
 }
-// /unlink ────────────────────────────────
+// /unlink
 async function handleUnlink(interaction) {
     await interaction.deferReply({ ephemeral: true });
-    const discordId = interaction.user.id;
-    const user = await prisma.user.findFirst({
-        where: { discordId },
-        select: { id: true, githubName: true },
-    });
-    if (!user) {
-        await interaction.editReply("紐付けされているアカウントが見つかりませんでした。");
-        return;
-    }
-    await prisma.user.update({ where: { id: user.id }, data: { discordId: null } });
-    linkedUserCache.set(discordId, null);
-    linkedUserCacheTime.set(discordId, Date.now());
-    await interaction.editReply(`✅ **${user.githubName}** との紐付けを解除しました。`);
+    const user = await (0, discord_link_1.unlinkDiscord)(pool, interaction.user.id);
+    await interaction.editReply(user
+        ? `✅ **${user.githubName}** との連携を解除しました。`
+        : "連携されているアカウントが見つかりませんでした。");
 }
 // /status ────────────────────────────────
 async function handleStatus(interaction) {
@@ -440,7 +382,7 @@ async function handleStatus(interaction) {
     if (!user) {
         await interaction.editReply(`📊 活動データ: **${rawCount}** 件記録済み\n` +
             `🔗 GitHub 紐付け: **未設定**\n\n` +
-            `\`/link github:<ユーザー名>\` でダッシュボードに表示できます。`);
+            `\`/link code:<設定画面で発行したコード>\` でダッシュボードに表示できます。`);
         return;
     }
     await interaction.editReply(`📊 活動データ: **${rawCount}** 件記録済み\n` +

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { withAdmin } from "@/lib/admin";
 import { prisma } from "@/lib/prisma";
 import {
   fetchUserRepos,
@@ -18,6 +18,7 @@ export const maxDuration = 60;
 
 function isMainBranchDeployment(): boolean {
   const branch = process.env.VERCEL_GIT_COMMIT_REF ?? process.env.GIT_BRANCH ?? "";
+  if (process.env.VERCEL_ENV === "production") return true;
   if (branch) return branch === "main";
 
   // Vercel の production 環境では main 扱いとして安全側に倒す
@@ -121,6 +122,10 @@ function aggregateLanguages(
 // ──────────────────────────────────────────────────────────────────
 
 export async function POST(request: Request) {
+  return withAdmin("refresh", () => refresh(request));
+}
+
+async function refresh(request: Request) {
   if (isMainBranchDeployment()) {
     return NextResponse.json({ error: "DB refresh is disabled on main branch" }, { status: 403 });
   }
@@ -128,11 +133,6 @@ export async function POST(request: Request) {
   const FALLBACK_TOKEN = process.env.GITHUB_ACCESS_TOKEN;
   if (!FALLBACK_TOKEN) {
     return NextResponse.json({ error: "GitHub token not configured" }, { status: 500 });
-  }
-
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const body = (await request.json().catch(() => ({}))) as { force?: boolean };
@@ -343,17 +343,18 @@ export async function POST(request: Request) {
     ...users.map((u) => redis.del(`repos:count:${u.githubName}`)),
   ]);
 
-  console.warn(`[refresh] triggered by ${session.user.name ?? session.user.id}`);
-
   const skippedCount = results.filter((r) => r.skipped).length;
 
-  return NextResponse.json({
-    message: "Refresh complete",
-    updatedUsers: results.length - skippedCount,
-    skippedUsers: skippedCount,
-    force,
-    results,
-  });
+  return NextResponse.json(
+    {
+      message: "Refresh complete",
+      updatedUsers: results.length - skippedCount,
+      skippedUsers: skippedCount,
+      force,
+      results,
+    },
+    { status: results.some((result) => result.error) ? 502 : 200 },
+  );
 }
 
 function appendError(existing: string | undefined, msg: string): string {

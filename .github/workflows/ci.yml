@@ -37,6 +37,9 @@ jobs:
       - name: ESLint チェック
         run: npm run lint
 
+      - name: Security regression tests
+        run: npm test
+
       - name: TypeScript 型チェック
         run: npm run typecheck
 

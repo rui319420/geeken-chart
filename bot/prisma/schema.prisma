@@ -16,6 +16,7 @@ datasource db {
 // ユーザー情報
 // ──────────────────────────────────────
 model User {
+  discordLinkCode DiscordLinkCode?
   id           String   @id @default(cuid())
 	name         String?
   githubId     String   @unique
@@ -166,4 +167,16 @@ model FrameworkUsage {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, framework])
+}
+model DiscordLinkCode {
+  userId String @id
+  codeHash String @unique
+  expiresAt DateTime
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model DiscordLinkRateLimit {
+  key String @id
+  attempts Int
+  resetAt DateTime
 }
